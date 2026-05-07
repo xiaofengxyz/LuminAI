@@ -1,6 +1,16 @@
 # LuminAI Task Progress Index
 
-Current task: Use Jellyfish as the platform base, split other project strengths into that base, document the LuminAI AI Film Engine, and keep the session task index current.
+Current task: Review starter kit and research report, finish remaining run-readiness gaps, test, run the project, clean the workspace, and push necessary changes without using sub-agents.
+
+## Session 2026-05-08 - Run Readiness Review And Execution
+
+| Node | Status | Evidence |
+| --- | --- | --- |
+| 1. Plan, document review, and project scan | Done | Read `docs/ai_film_engine_starter_kit_final_stable_v_1.md`, `docs/complete_ai_manjv_open_source_research_report_2026.md`, README, architecture docs, execution plans, task index, and current source/tests; found previous core phases are implemented, while run entrypoint and some status docs need consolidation. |
+| 2. Runnable project entrypoint | Done | Added `src/film_engine/demo.py` and `src/film_engine/server.py` for dependency-light CLI/HTTP run readiness, with `/health` and `/demo/closed-loop-plan`. |
+| 3. Test and documentation hardening | Done | Added `tests/test_luminai_runtime_entrypoint.py`; targeted `python3 -m pytest -q -s tests/test_luminai_runtime_entrypoint.py` passed 2 tests; updated README, project manual, Jellyfish blueprint, and execution plan status. |
+| 4. Full verification and project run | Done | Full `python3 -m pytest -q -s` passed 135 tests; `python3 -m src.film_engine.demo --compact` ran cleanly; local HTTP server started on `http://127.0.0.1:8765`; `/health` returned `status=ok`; `/demo/closed-loop-plan` returned 9 workflow steps, 1 retry, and post-production enabled. |
+| 5. Cleanup, commit, and push | Done | Removed `__pycache__`, `.pytest_cache/`, and `output/`; conflict checks found no unmerged files or conflict markers; `git diff --cached --check` passed; final change set is committed and pushed as the session closeout. |
 
 ## Session 2026-05-08 - Continuous Phase Execution
 

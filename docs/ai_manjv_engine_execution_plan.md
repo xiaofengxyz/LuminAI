@@ -56,6 +56,24 @@ The report identifies the real moat for a 2-3 person AI manju team as a reusable
 | Phase 8 | Done | `src/film_engine/director.py` validates Director DSL and prepares character/scene bible continuity context for prompt compilation. |
 | Phase 9 | Done | `src/film_engine/production.py` builds closed-loop chapter plans with render requests, QA reports, retry requests, and optional post-production planning. |
 
+## 2026-05-08 Run Readiness Review Plan
+
+| Finding | Action | Status |
+| --- | --- | --- |
+| Previous backend phases are implemented, but the repository only documented tests and did not expose a run-ready local entrypoint. | Add a dependency-light CLI/HTTP demo for health and closed-loop production plan smoke checks. | Done |
+| Jellyfish blueprint status drifted after later implementation phases. | Mark Film Core attachment, director consistency, QA/retry/batch closure, and run-readiness endpoints as done; move real Jellyfish API binding to the next product phase. | Done |
+| Verification must be fixed in code, not only described. | Add tests for the demo summary and HTTP endpoints, then run targeted and full pytest. | Done |
+| The project must be run locally in this session. | Start the HTTP server and query `/health` plus `/demo/closed-loop-plan`. | Done |
+
+## Next Product Work After This Pass
+
+| Priority | Delivery |
+| --- | --- |
+| 1 | Bind `JellyfishRecordMapper` and `ClosedLoopProductionPlanner` to a real Jellyfish fork/API client. |
+| 2 | Persist generated media, QA reports, retry decisions, and post-production results back into Jellyfish records. |
+| 3 | Add provider workers for `RenderRequest` and `PostProductionStep` execution. |
+| 4 | Expose batch, QA, retry, and final export controls in the Jellyfish studio UI. |
+
 ## Non-Goals For This Pass
 
 - No giant monolith.

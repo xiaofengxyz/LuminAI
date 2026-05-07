@@ -46,6 +46,8 @@ Current implemented capabilities:
 - prepare director consistency from character and scene bibles
 - plan TTS, subtitle, FFmpeg compose, concat, and export steps
 - build closed-loop chapter plans with render requests, QA, retry, and optional post-production
+- run a dependency-light HTTP/CLI smoke service that exposes health and a
+  closed-loop demo production plan
 
 The latest bridge code is:
 
@@ -54,7 +56,10 @@ The latest bridge code is:
 - `src/film_engine/director.py`
 - `src/film_engine/post_production.py`
 - `src/film_engine/production.py`
+- `src/film_engine/demo.py`
+- `src/film_engine/server.py`
 - `tests/test_jellyfish_platform_bridge.py`
+- `tests/test_luminai_runtime_entrypoint.py`
 
 ---
 
@@ -202,6 +207,12 @@ Run targeted bridge tests:
 python3 -m pytest -q -s tests/test_jellyfish_platform_bridge.py
 ```
 
+Run the runtime entrypoint tests:
+
+```bash
+python3 -m pytest -q -s tests/test_luminai_runtime_entrypoint.py
+```
+
 Run the full suite:
 
 ```bash
@@ -212,7 +223,28 @@ The `-s` flag is the repository's known stable mode for this environment.
 
 ---
 
-## 8. Session Task Index Rule
+## 8. Run The Project
+
+Start the local LuminAI runtime server:
+
+```bash
+python3 -m src.film_engine.server --host 127.0.0.1 --port 8765
+```
+
+Smoke endpoints:
+
+```text
+GET /health
+GET /demo/closed-loop-plan
+```
+
+The demo endpoint returns a full closed-loop chapter plan: workflow order,
+compiled render requests, QA failures, retry requests, and post-production
+steps.
+
+---
+
+## 9. Session Task Index Rule
 
 Every session must update:
 

@@ -152,6 +152,10 @@ Implemented in this repository:
 - `src/film_engine/post_production.py`: huobao-style TTS, subtitle, FFmpeg
   compose, concat, and export planning under runtime abstraction.
 - `src/apps/comic_gen`: current series/episode/asset/task pipeline.
+- `src/film_engine/demo.py`: closed-loop demo plan for run-readiness smoke
+  testing.
+- `src/film_engine/server.py`: dependency-light local HTTP runtime with health
+  and demo plan endpoints.
 
 The current bridge defines this workflow order:
 
@@ -180,9 +184,10 @@ generation, QA, and retry.
 | Phase 1 | Done | Added `StudioPlatformBridge` contracts and tests. |
 | Phase 2 | Done | Documented Jellyfish base strategy, capability split, and project manual. |
 | Phase 3 | Done | Added `JellyfishRecordMapper` to map Jellyfish API/ORM-shaped project, chapter, shot/detail, asset, frame, dialogue, and task records to `StudioProject`, `StudioChapter`, `StudioShot`, `StudioAsset`, and `StudioTask` without importing Jellyfish runtime code. |
-| Phase 4 | Next | Attach Film Core services to Jellyfish shot readiness and generation workspace. |
+| Phase 4 | Done | Attached Film Core planning to Jellyfish-style shot readiness through `ClosedLoopProductionPlanner`, producing continuity, director context, prompt compilation, render requests, QA reports, and retry requests. |
 | Phase 5 | Done | Added runtime-neutral post-production planning for TTS, subtitles, FFmpeg single-shot compose, multi-shot concat, and final export. |
-| Phase 6 | In Progress | Added backend director rules and character/scene bible consistency contracts; QA metrics, retry policies, and batch operations are handled in the Film Core closure before UI binding. |
+| Phase 6 | Done | Added backend director rules, character/scene bible consistency contracts, QA/retry/batch closure, and dependency-light run-readiness endpoints before UI binding. |
+| Phase 7 | Next | Bind the bridge and closed-loop planner to a real Jellyfish fork/API client and write generated media, QA, retry, and post-production outcomes back to platform records. |
 
 ---
 
@@ -218,3 +223,5 @@ The Jellyfish-based LuminAI platform is acceptable when:
 - retry decisions patch prompts and parameters without manual prompt rewriting
 - batch production can process multiple chapters with shared assets and state
 - generated media writes back to the platform as reusable references
+- the local smoke server can start and expose health plus a closed-loop demo
+  plan without provider credentials

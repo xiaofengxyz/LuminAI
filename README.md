@@ -37,7 +37,28 @@ python3 -m pytest -q -s
 Expected result:
 
 ```text
-133 passed
+135 passed
+```
+
+## Run The Project
+
+Start the dependency-light LuminAI runtime server:
+
+```bash
+python3 -m src.film_engine.server --host 127.0.0.1 --port 8765
+```
+
+Smoke endpoints:
+
+```text
+GET http://127.0.0.1:8765/health
+GET http://127.0.0.1:8765/demo/closed-loop-plan
+```
+
+For a one-shot CLI run of the closed-loop demo plan:
+
+```bash
+python3 -m src.film_engine.demo
 ```
 
 ## Development Direction
@@ -53,9 +74,10 @@ Reference docs:
 
 Next product layers should build on these systems instead of bypassing them:
 
-1. Character asset registry with references, outfits, voices, embeddings, and
-   identity QA metrics.
-2. Director DSL and shot graph templates for controllable camera language.
-3. Film state continuity across episodes and batches.
-4. Runtime adapters for additional providers without changing the film core.
-5. QA-driven retry loops before final editing and delivery.
+1. Bind the bridge to a real Jellyfish fork/API client.
+2. Write approved outputs, QA reports, retry outcomes, and post-production
+   results back into Jellyfish media/task/shot records.
+3. Expose closed-loop QA, retry, post-production, and batch controls in the
+   studio UI.
+4. Add provider-specific workers that execute `RenderRequest` and
+   `PostProductionStep` records while keeping Film Core runtime-neutral.
