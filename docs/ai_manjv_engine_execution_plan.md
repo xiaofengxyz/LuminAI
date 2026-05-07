@@ -47,6 +47,15 @@ The report identifies the real moat for a 2-3 person AI manju team as a reusable
 | Phase 8 | Director and consistency layers: director_ai DSL, BigBanana cinematic rules, StoryDiffusion reference workflow, character/scene bibles. |
 | Phase 9 | QA, retry, batch UI, documentation, samples, tests, cleanup, commit, and push. |
 
+## Current Follow-up Implementation Status
+
+| Phase | Status | Evidence |
+| --- | --- | --- |
+| Phase 6 | Done | `src/film_engine/jellyfish.py` maps Jellyfish OpenAPI/ORM-shaped project, chapter, shot/detail, asset, frame, dialogue, and task records to bridge contracts. |
+| Phase 7 | Done | `src/film_engine/post_production.py` plans TTS, subtitles, FFmpeg single-shot compose, multi-shot concat, and final export as runtime-neutral steps. |
+| Phase 8 | Done | `src/film_engine/director.py` validates Director DSL and prepares character/scene bible continuity context for prompt compilation. |
+| Phase 9 | Done | `src/film_engine/production.py` builds closed-loop chapter plans with render requests, QA reports, retry requests, and optional post-production planning. |
+
 ## Non-Goals For This Pass
 
 - No giant monolith.

@@ -45,3 +45,29 @@ kept as prompt patches for the next compiled prompt.
 Runtime adapters receive a compiled render request and return a render result.
 They do not own story logic, continuity, or QA policy. This keeps Kling, Wan,
 Vidu, Veo-style providers replaceable.
+
+## Closed Loop Planner
+
+`ClosedLoopProductionPlanner` wires the backend contracts into one repeatable
+chapter plan:
+
+```text
+StudioShot
+-> ShotContinuityState
+-> DirectorConsistencyEngine
+-> PromptCompiler
+-> RenderRequest
+-> RuleBasedQAEngine
+-> RetryEngine
+-> optional PostProductionPlanner
+```
+
+The planner returns:
+
+- render requests for first-pass generation
+- QA reports per shot
+- retry requests with prompt and parameter patches
+- optional TTS/subtitle/FFmpeg/export post-production plan
+
+This is the backend closure before a Jellyfish UI button or task worker binds
+the plan to real execution.

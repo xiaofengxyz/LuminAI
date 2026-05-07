@@ -37,7 +37,7 @@ python3 -m pytest -q -s
 Expected result:
 
 ```text
-117 passed
+133 passed
 ```
 
 ## Development Direction

@@ -42,10 +42,18 @@ Current implemented capabilities:
 - convert QA failures into retry decisions
 - plan industrial batch workflows across episodes
 - map Jellyfish-style Project/Chapter/Shot/Asset/Task concepts into Film Core
+- map Jellyfish OpenAPI/ORM-shaped records into bridge contracts
+- prepare director consistency from character and scene bibles
+- plan TTS, subtitle, FFmpeg compose, concat, and export steps
+- build closed-loop chapter plans with render requests, QA, retry, and optional post-production
 
 The latest bridge code is:
 
 - `src/film_engine/platform.py`
+- `src/film_engine/jellyfish.py`
+- `src/film_engine/director.py`
+- `src/film_engine/post_production.py`
+- `src/film_engine/production.py`
 - `tests/test_jellyfish_platform_bridge.py`
 
 ---
@@ -54,14 +62,13 @@ The latest bridge code is:
 
 The next product layers should be added in this order:
 
-1. Connect an actual Jellyfish fork or API client to `StudioPlatformBridge`.
-2. Feed Jellyfish shot readiness into LuminAI Film State.
-3. Compile Director DSL and continuity into provider-specific render requests.
-4. Attach huobao-drama-style FFmpeg, subtitle, TTS, and stitching as Runtime Layer services.
-5. Add character/scene bible contracts for repeatable identity and location continuity.
-6. Run QA after each generated shot and create retry decisions automatically.
-7. Write approved outputs back into Jellyfish media and shot records.
-8. Expose batch production controls in the studio UI.
+1. Bind `JellyfishRecordMapper` to a real Jellyfish fork/API client.
+2. Write approved outputs and retry outcomes back into Jellyfish media, task,
+   and shot records.
+3. Expose QA, retry, post-production, and batch production controls in the
+   studio UI.
+4. Add provider-specific workers that execute the closed-loop plans while
+   keeping Film Core runtime-neutral.
 
 ---
 

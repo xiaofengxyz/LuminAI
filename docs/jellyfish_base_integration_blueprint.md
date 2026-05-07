@@ -145,6 +145,12 @@ Implemented in this repository:
 - `src/film_engine/retry.py`: retry decision contract.
 - `src/film_engine/batch.py`: industrial batch plan.
 - `src/film_engine/platform.py`: Jellyfish-style platform bridge.
+- `src/film_engine/jellyfish.py`: dependency-free mapper for Jellyfish
+  OpenAPI/ORM-shaped project, chapter, shot, asset, and task records.
+- `src/film_engine/director.py`: Director DSL validation plus character and
+  scene bible consistency preparation.
+- `src/film_engine/post_production.py`: huobao-style TTS, subtitle, FFmpeg
+  compose, concat, and export planning under runtime abstraction.
 - `src/apps/comic_gen`: current series/episode/asset/task pipeline.
 
 The current bridge defines this workflow order:
@@ -173,10 +179,10 @@ generation, QA, and retry.
 | Phase 0 | Done | Read AGENTS and starter kit, confirmed Jellyfish as base, reviewed current code and docs. |
 | Phase 1 | Done | Added `StudioPlatformBridge` contracts and tests. |
 | Phase 2 | Done | Documented Jellyfish base strategy, capability split, and project manual. |
-| Phase 3 | Next | Fork or vendor Jellyfish, map its database/API objects to `StudioProject`, `StudioChapter`, `StudioShot`, `StudioAsset`, and `StudioTask`. |
+| Phase 3 | Done | Added `JellyfishRecordMapper` to map Jellyfish API/ORM-shaped project, chapter, shot/detail, asset, frame, dialogue, and task records to `StudioProject`, `StudioChapter`, `StudioShot`, `StudioAsset`, and `StudioTask` without importing Jellyfish runtime code. |
 | Phase 4 | Next | Attach Film Core services to Jellyfish shot readiness and generation workspace. |
-| Phase 5 | Next | Bring huobao-drama-style FFmpeg/TTS/subtitle/export into Runtime Layer. |
-| Phase 6 | Next | Add director rules, character/scene bibles, QA metrics, retry policies, and batch operations to Jellyfish UI. |
+| Phase 5 | Done | Added runtime-neutral post-production planning for TTS, subtitles, FFmpeg single-shot compose, multi-shot concat, and final export. |
+| Phase 6 | In Progress | Added backend director rules and character/scene bible consistency contracts; QA metrics, retry policies, and batch operations are handled in the Film Core closure before UI binding. |
 
 ---
 

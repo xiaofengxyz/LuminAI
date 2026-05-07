@@ -7,6 +7,8 @@
 - Graph-driven Workflow Engine
 - State-centric Data Management
 - Runtime Abstraction Layer
+- Post-production Runtime Planner
+- Director Consistency Layer
 - Compiler Architecture for Prompts
 - Modular System Design
 - QA Engine and Retry Engine
@@ -23,6 +25,8 @@ Novel/Script → Jellyfish Project/Chapter/Shot Workspace → LuminAI Platform B
 | Application | `src/apps/comic_gen` | Series, episodes, assets, prompt fallback, media snapshots, provider routing. |
 | Platform Bridge | `src/film_engine/platform.py` | Jellyfish-style Project/Chapter/Shot/Asset/Task contracts mapped into Film Core objects. |
 | Film Core | `src/film_engine` | ECS entities, workflow graph, film state, prompt compiler, QA, retry, batch planning. |
+| Director Consistency | `src/film_engine/director.py` | Director DSL validation, character bibles, scene bibles, continuity preparation, and prompt-context handoff. |
+| Post-production | `src/film_engine/post_production.py` | Runtime-neutral TTS, subtitle, FFmpeg compose, concat, and final export planning. |
 | Runtime | `src/models` | Wanx/DashScope, Kling vendor, Vidu vendor, and Wan image reference adapters. |
 | Utilities | `src/utils` | Media ref classification, local/OSS resolution, provider family registry. |
 
