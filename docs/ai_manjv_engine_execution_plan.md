@@ -1,6 +1,26 @@
 # AI Manju Engine Execution Plan
 
-This plan converts the research report into an implementation path for LuminAI.
+This plan converts the research report and Jellyfish starter-kit direction into
+an implementation path for LuminAI.
+
+## Platform Base Decision
+
+Use Jellyfish as the AI Studio OS / Workflow Core:
+
+- project, chapter, shot, asset, media, task, OpenAPI, and studio UI base
+- no rewrite from zero
+- no heavy modification of one runtime project
+- Film Core attaches through stable bridge contracts
+
+Implemented bridge:
+
+- `src/film_engine/platform.py`
+- `tests/test_jellyfish_platform_bridge.py`
+
+Detailed blueprint:
+
+- `docs/jellyfish_base_integration_blueprint.md`
+- `docs/project_function_manual.md`
 
 ## Research Findings
 
@@ -21,11 +41,15 @@ The report identifies the real moat for a 2-3 person AI manju team as a reusable
 | Phase 2 | Comic generation pipeline: series/episode asset inheritance, prompt fallback, local media snapshots, and provider routing. |
 | Phase 3 | Runtime adapters for Wan/DashScope, Kling vendor, Vidu vendor, and Wan image references. |
 | Phase 4 | Industrial film engine primitives: ECS-inspired registries, graph workflow, prompt compiler, QA reports, retry planner, and batch planner. |
-| Phase 5 | Documentation, samples, tests, cleanup, commit, and push. |
+| Phase 5 | Jellyfish platform bridge: StudioProject, StudioChapter, StudioShot, StudioAsset, StudioTask, continuity mapping, workflow mapping, and render request boundary. |
+| Phase 6 | Jellyfish fork/API integration: map real Jellyfish project/chapter/shot/asset/task records to bridge contracts. |
+| Phase 7 | Runtime grafting: add huobao-drama-style FFmpeg, subtitle, TTS, stitching, and export services under runtime abstraction. |
+| Phase 8 | Director and consistency layers: director_ai DSL, BigBanana cinematic rules, StoryDiffusion reference workflow, character/scene bibles. |
+| Phase 9 | QA, retry, batch UI, documentation, samples, tests, cleanup, commit, and push. |
 
 ## Non-Goals For This Pass
 
 - No giant monolith.
 - No hardcoded final cinematic prompts.
 - No direct dependency on one runtime provider.
-- No UI build until the backend foundation is stable.
+- No duplicate platform UI before Jellyfish base integration is stable.

@@ -5,6 +5,8 @@ LuminAI is an industrial AI manju / AI film engine foundation.
 It is designed for repeatable content production rather than one-off prompt
 demos:
 
+- Jellyfish-style studio platform bridge for project/chapter/shot/asset/task
+  workflows
 - graph-driven episode workflows
 - ECS-inspired asset and state primitives
 - character, scene, prop, and shot continuity
@@ -17,6 +19,8 @@ demos:
 ```text
 src/apps/comic_gen/     Series, episode, asset, prompt, and video-task pipeline
 src/film_engine/        Reusable graph/ECS/state/compiler/QA/retry/batch systems
+src/film_engine/platform.py
+                        Jellyfish-style studio OS bridge
 src/models/             Runtime adapters for Wanx, Kling, Vidu, and Wan image refs
 src/utils/              Provider registry, media reference resolver, OSS facade
 docs/                   Research, execution plan, architecture notes
@@ -38,8 +42,16 @@ Expected result:
 
 ## Development Direction
 
-The current implementation establishes the backend foundation. Next product
-layers should build on these systems instead of bypassing them:
+The current implementation establishes the backend foundation. Product work
+should use Jellyfish as the studio OS / workflow base, then attach LuminAI Film
+Core as the continuity, prompt, QA, retry, and runtime abstraction layer.
+
+Reference docs:
+
+- `docs/jellyfish_base_integration_blueprint.md`
+- `docs/project_function_manual.md`
+
+Next product layers should build on these systems instead of bypassing them:
 
 1. Character asset registry with references, outfits, voices, embeddings, and
    identity QA metrics.

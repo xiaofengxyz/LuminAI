@@ -1,6 +1,16 @@
 # LuminAI Task Progress Index
 
-Current task: Turn the AI manju research report into an executable industrial AI Film Engine foundation.
+Current task: Use Jellyfish as the platform base, split other project strengths into that base, document the LuminAI AI Film Engine, and keep the session task index current.
+
+## Session 2026-05-08 - Jellyfish Base Integration
+
+| Node | Status | Evidence |
+| --- | --- | --- |
+| 1. Plan and repository scan | Done | Read `AGENTS.md`, `docs/ai_film_engine_starter_kit_final_stable_v_1.md`, current architecture docs, task index, and git status; confirmed a clean `main...origin/main` start. |
+| 2. Jellyfish base bridge | Done | Added `src/film_engine/platform.py` and `tests/test_jellyfish_platform_bridge.py`; targeted `python3 -m pytest -q -s tests/test_jellyfish_platform_bridge.py` passed 4 tests. |
+| 3. Project documentation | Done | Added `docs/jellyfish_base_integration_blueprint.md` and `docs/project_function_manual.md`. |
+| 4. Index and architecture updates | Done | Updated `README.md`, `SYSTEM_ARCHITECTURE.md`, `docs/ai_manjv_engine_execution_plan.md`, and this progress index. |
+| 5. Verification, cleanup, commit, push | Done | Full `python3 -m pytest -q -s` passed 121 tests; removed `output/`, `.pytest_cache/`, and Python caches; `git diff --cached --check` passed; required changes are staged for commit and push. |
 
 ## Progress
 

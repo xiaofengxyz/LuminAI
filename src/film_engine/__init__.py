@@ -3,6 +3,15 @@
 from src.film_engine.batch import BatchPlan, BatchPlanner
 from src.film_engine.ecs import Component, Entity, EntityRegistry
 from src.film_engine.graph import WorkflowGraph, WorkflowNode
+from src.film_engine.platform import (
+    JELLYFISH_FILM_WORKFLOW,
+    StudioAsset,
+    StudioChapter,
+    StudioPlatformBridge,
+    StudioProject,
+    StudioShot,
+    StudioTask,
+)
 from src.film_engine.prompt_compiler import CompiledPrompt, PromptCompiler
 from src.film_engine.qa import QAIssue, QAReport, RuleBasedQAEngine
 from src.film_engine.retry import RetryDecision, RetryEngine
@@ -17,6 +26,13 @@ __all__ = [
     "EntityRegistry",
     "WorkflowGraph",
     "WorkflowNode",
+    "JELLYFISH_FILM_WORKFLOW",
+    "StudioAsset",
+    "StudioChapter",
+    "StudioPlatformBridge",
+    "StudioProject",
+    "StudioShot",
+    "StudioTask",
     "CompiledPrompt",
     "PromptCompiler",
     "QAIssue",
