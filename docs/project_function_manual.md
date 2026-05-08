@@ -46,19 +46,24 @@ Current implemented capabilities:
 - prepare director consistency from character and scene bibles
 - plan TTS, subtitle, FFmpeg compose, concat, and export steps
 - build closed-loop chapter plans with render requests, QA, retry, and optional post-production
-- run a dependency-light HTTP/CLI smoke service that exposes health and a
-  closed-loop demo production plan
+- track Jellyfish as a real upstream studio base under `vendor/jellyfish`
+- inspect Jellyfish base status, run commands, ports, and missing files
+- run a dependency-light HTTP/CLI smoke service that exposes health, a
+  closed-loop demo production plan, Studio Dashboard UI, and status APIs
 
 The latest bridge code is:
 
 - `src/film_engine/platform.py`
 - `src/film_engine/jellyfish.py`
+- `src/film_engine/jellyfish_base.py`
 - `src/film_engine/director.py`
 - `src/film_engine/post_production.py`
 - `src/film_engine/production.py`
+- `src/film_engine/studio.py`
 - `src/film_engine/demo.py`
 - `src/film_engine/server.py`
 - `tests/test_jellyfish_platform_bridge.py`
+- `tests/test_jellyfish_base_status.py`
 - `tests/test_luminai_runtime_entrypoint.py`
 
 ---
@@ -67,7 +72,7 @@ The latest bridge code is:
 
 The next product layers should be added in this order:
 
-1. Bind `JellyfishRecordMapper` to a real Jellyfish fork/API client.
+1. Bind `JellyfishRecordMapper` to the tracked Jellyfish fork/API client.
 2. Write approved outputs and retry outcomes back into Jellyfish media, task,
    and shot records.
 3. Expose QA, retry, post-production, and batch production controls in the
@@ -187,6 +192,11 @@ src/apps/comic_gen/      Current series, episode, asset, prompt, and task pipeli
 src/film_engine/         Reusable Film Core systems
 src/film_engine/platform.py
                          Jellyfish-style platform bridge
+src/film_engine/jellyfish_base.py
+                         Jellyfish upstream checkout and run-status inspector
+src/film_engine/studio.py
+                         Local Studio Dashboard payload and renderer
+vendor/jellyfish/        Upstream Jellyfish Studio OS base submodule
 src/models/              Runtime model adapters
 src/utils/               Media resolution and provider registry utilities
 docs/                    Architecture, plans, workflows, and session index
@@ -213,6 +223,12 @@ Run the runtime entrypoint tests:
 python3 -m pytest -q -s tests/test_luminai_runtime_entrypoint.py
 ```
 
+Run the Jellyfish base and stage-evidence tests:
+
+```bash
+python3 -m pytest -q -s tests/test_jellyfish_base_status.py
+```
+
 Run the full suite:
 
 ```bash
@@ -225,22 +241,43 @@ The `-s` flag is the repository's known stable mode for this environment.
 
 ## 8. Run The Project
 
-Start the local LuminAI runtime server:
+Start the local LuminAI runtime server and Studio Dashboard:
 
 ```bash
 python3 -m src.film_engine.server --host 127.0.0.1 --port 8765
+```
+
+Open the UI:
+
+```text
+http://127.0.0.1:8765/
 ```
 
 Smoke endpoints:
 
 ```text
 GET /health
+GET /api/studio/status
+GET /api/jellyfish/base-status
 GET /demo/closed-loop-plan
 ```
 
 The demo endpoint returns a full closed-loop chapter plan: workflow order,
 compiled render requests, QA failures, retry requests, and post-production
 steps.
+
+Inspect the Jellyfish base:
+
+```bash
+python3 -m src.film_engine.jellyfish_base
+```
+
+Validate the Jellyfish Docker Compose config:
+
+```bash
+cd vendor/jellyfish
+docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml config -q
+```
 
 ---
 

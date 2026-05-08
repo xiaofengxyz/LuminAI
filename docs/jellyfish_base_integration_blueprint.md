@@ -99,6 +99,11 @@ The bridge layer added in this session is `src/film_engine/platform.py`.
 It models Jellyfish-style platform objects without coupling the Film Core to a
 specific Jellyfish fork or database schema.
 
+The upstream Jellyfish base is now tracked at `vendor/jellyfish` as a git
+submodule. `src/film_engine/jellyfish_base.py` inspects the base checkout,
+reports the pinned commit, exposes Docker/local run commands, and feeds the
+Studio Dashboard.
+
 ---
 
 ## 4. Concept Mapping
@@ -147,6 +152,8 @@ Implemented in this repository:
 - `src/film_engine/platform.py`: Jellyfish-style platform bridge.
 - `src/film_engine/jellyfish.py`: dependency-free mapper for Jellyfish
   OpenAPI/ORM-shaped project, chapter, shot, asset, and task records.
+- `src/film_engine/jellyfish_base.py`: upstream Jellyfish base inspector and
+  run-command manifest.
 - `src/film_engine/director.py`: Director DSL validation plus character and
   scene bible consistency preparation.
 - `src/film_engine/post_production.py`: huobao-style TTS, subtitle, FFmpeg
@@ -155,7 +162,10 @@ Implemented in this repository:
 - `src/film_engine/demo.py`: closed-loop demo plan for run-readiness smoke
   testing.
 - `src/film_engine/server.py`: dependency-light local HTTP runtime with health
-  and demo plan endpoints.
+  demo plan endpoints, Studio Dashboard UI, and status APIs.
+- `src/film_engine/studio.py`: stage index, industrial review payload, and
+  local dashboard renderer.
+- `vendor/jellyfish`: pinned upstream Jellyfish Studio OS base.
 
 The current bridge defines this workflow order:
 
@@ -187,7 +197,8 @@ generation, QA, and retry.
 | Phase 4 | Done | Attached Film Core planning to Jellyfish-style shot readiness through `ClosedLoopProductionPlanner`, producing continuity, director context, prompt compilation, render requests, QA reports, and retry requests. |
 | Phase 5 | Done | Added runtime-neutral post-production planning for TTS, subtitles, FFmpeg single-shot compose, multi-shot concat, and final export. |
 | Phase 6 | Done | Added backend director rules, character/scene bible consistency contracts, QA/retry/batch closure, and dependency-light run-readiness endpoints before UI binding. |
-| Phase 7 | Next | Bind the bridge and closed-loop planner to a real Jellyfish fork/API client and write generated media, QA, retry, and post-production outcomes back to platform records. |
+| Phase 7 | Done | Added a real upstream Jellyfish submodule, Jellyfish base inspector, local Studio Dashboard UI, and status APIs. |
+| Phase 8 | Next | Bind the bridge and closed-loop planner to live Jellyfish backend APIs and write generated media, QA, retry, and post-production outcomes back to platform records. |
 
 ---
 
@@ -223,5 +234,6 @@ The Jellyfish-based LuminAI platform is acceptable when:
 - retry decisions patch prompts and parameters without manual prompt rewriting
 - batch production can process multiple chapters with shared assets and state
 - generated media writes back to the platform as reusable references
-- the local smoke server can start and expose health plus a closed-loop demo
+- the local Studio Dashboard can start and expose health, stage evidence,
+  Jellyfish base status, QA failures, retry requests, and a closed-loop demo
   plan without provider credentials

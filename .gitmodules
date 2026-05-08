@@ -1,0 +1,3 @@
+[submodule "vendor/jellyfish"]
+	path = vendor/jellyfish
+	url = https://github.com/Forget-C/Jellyfish

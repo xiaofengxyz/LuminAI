@@ -1,6 +1,17 @@
 # LuminAI Task Progress Index
 
-Current task: Review starter kit and research report, finish remaining run-readiness gaps, test, run the project, clean the workspace, and push necessary changes without using sub-agents.
+Current task: Answer the UI/Jellyfish-base gaps, attach a real Jellyfish upstream base, expose an operable Studio Dashboard, document the film-grade product/architecture review, test, run, clean, commit, and push necessary changes without using sub-agents.
+
+## Session 2026-05-08 - Jellyfish Base And Studio UI Closure
+
+| Node | Status | Evidence |
+| --- | --- | --- |
+| 1. Plan and gap review | Done | Planned single-agent execution; confirmed current LuminAI server root only returned JSON, Film Core existed, and no real Jellyfish base checkout was tracked. |
+| 2. Jellyfish base checkout | Done | Added upstream `https://github.com/Forget-C/Jellyfish` as `vendor/jellyfish` submodule; Docker Compose config validates with `docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml config -q`. |
+| 3. Studio UI and status APIs | Done | Added `src/film_engine/studio.py`; updated `src/film_engine/server.py` so `/` serves an operable dashboard and `/api/studio/status`, `/api/jellyfish/base-status` expose machine-readable state. |
+| 4. Product/architecture review | Done | Added `docs/industrial_ai_film_engine_review_2026.md`, updated architecture/manual/blueprint/execution docs, and added `docs/ai_film_engine_test_cases.md`. |
+| 5. Test and run verification | Done | Added tests for UI, status APIs, Jellyfish base inspection, and stage evidence; targeted `python3 -m pytest -q -s tests/test_luminai_runtime_entrypoint.py tests/test_jellyfish_base_status.py` passed 6 tests; full `python3 -m pytest -q -s` passed 139 tests after adding `pytest.ini` to keep upstream Jellyfish tests out of LuminAI's local suite. LuminAI UI is running at `http://127.0.0.1:8765/`; Jellyfish backend is running at `http://127.0.0.1:8000/openapi.json`; Jellyfish frontend is running at `http://127.0.0.1:7788/`. Docker Compose full-stack build was attempted twice, but backend image build hit Debian apt mirror `502/404`; local SQLite backend plus built frontend image was used as the successful run path. |
+| 6. Cleanup, commit, push | Pending | Remove caches/generated clutter, check conflicts, commit required changes, and push to `origin/main`. |
 
 ## Session 2026-05-08 - Run Readiness Review And Execution
 

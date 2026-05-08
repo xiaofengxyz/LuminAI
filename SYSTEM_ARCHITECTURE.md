@@ -3,6 +3,8 @@
 ## Core Components
 
 - Jellyfish-style AI Studio OS / Workflow Core Bridge
+- Jellyfish upstream base checkout and run-status inspector
+- Local Studio Dashboard for stage evidence, QA, retry, and base status
 - ECS-inspired Entity System
 - Graph-driven Workflow Engine
 - State-centric Data Management
@@ -24,6 +26,8 @@ Novel/Script → Jellyfish Project/Chapter/Shot Workspace → LuminAI Platform B
 | --- | --- | --- |
 | Application | `src/apps/comic_gen` | Series, episodes, assets, prompt fallback, media snapshots, provider routing. |
 | Platform Bridge | `src/film_engine/platform.py` | Jellyfish-style Project/Chapter/Shot/Asset/Task contracts mapped into Film Core objects. |
+| Jellyfish Base | `vendor/jellyfish`, `src/film_engine/jellyfish_base.py` | Upstream Jellyfish Studio OS submodule plus base status, run commands, ports, and missing-file checks. |
+| Studio Dashboard | `src/film_engine/studio.py`, `src/film_engine/server.py` | Local dependency-light UI and status APIs for stage completion, shot QA, retry, and Jellyfish base readiness. |
 | Film Core | `src/film_engine` | ECS entities, workflow graph, film state, prompt compiler, QA, retry, batch planning. |
 | Director Consistency | `src/film_engine/director.py` | Director DSL validation, character bibles, scene bibles, continuity preparation, and prompt-context handoff. |
 | Post-production | `src/film_engine/post_production.py` | Runtime-neutral TTS, subtitle, FFmpeg compose, concat, and final export planning. |
@@ -39,6 +43,10 @@ OpenAPI contracts, and studio UI.
 LuminAI Film Core should attach below that platform boundary and own continuity,
 Director DSL, prompt compilation, runtime abstraction, QA, retry, and batch
 production. The bridge keeps the fork/API schema replaceable.
+
+The tracked upstream base lives at `vendor/jellyfish`. LuminAI exposes its own
+local dashboard for run-readiness and stage evidence while the next product
+step moves these controls into the Jellyfish frontend and backend API records.
 
 ## Key Principles
 

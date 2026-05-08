@@ -15,12 +15,16 @@ Use Jellyfish as the AI Studio OS / Workflow Core:
 Implemented bridge:
 
 - `src/film_engine/platform.py`
+- `src/film_engine/jellyfish_base.py`
 - `tests/test_jellyfish_platform_bridge.py`
+- `tests/test_jellyfish_base_status.py`
 
 Detailed blueprint:
 
 - `docs/jellyfish_base_integration_blueprint.md`
 - `docs/project_function_manual.md`
+- `docs/industrial_ai_film_engine_review_2026.md`
+- `docs/ai_film_engine_test_cases.md`
 
 ## Research Findings
 
@@ -55,6 +59,7 @@ The report identifies the real moat for a 2-3 person AI manju team as a reusable
 | Phase 7 | Done | `src/film_engine/post_production.py` plans TTS, subtitles, FFmpeg single-shot compose, multi-shot concat, and final export as runtime-neutral steps. |
 | Phase 8 | Done | `src/film_engine/director.py` validates Director DSL and prepares character/scene bible continuity context for prompt compilation. |
 | Phase 9 | Done | `src/film_engine/production.py` builds closed-loop chapter plans with render requests, QA reports, retry requests, and optional post-production planning. |
+| Phase 10 | Done | `vendor/jellyfish` tracks the real upstream Jellyfish base; `src/film_engine/studio.py` and `src/film_engine/server.py` expose the Studio Dashboard plus status APIs. |
 
 ## 2026-05-08 Run Readiness Review Plan
 
@@ -64,6 +69,7 @@ The report identifies the real moat for a 2-3 person AI manju team as a reusable
 | Jellyfish blueprint status drifted after later implementation phases. | Mark Film Core attachment, director consistency, QA/retry/batch closure, and run-readiness endpoints as done; move real Jellyfish API binding to the next product phase. | Done |
 | Verification must be fixed in code, not only described. | Add tests for the demo summary and HTTP endpoints, then run targeted and full pytest. | Done |
 | The project must be run locally in this session. | Start the HTTP server and query `/health` plus `/demo/closed-loop-plan`. | Done |
+| The previous run path had no UI and no real Jellyfish checkout. | Track Jellyfish as a submodule, add base inspection, expose `/` as Studio Dashboard, and add `/api/studio/status` plus `/api/jellyfish/base-status`. | Done |
 
 ## Next Product Work After This Pass
 
@@ -72,7 +78,7 @@ The report identifies the real moat for a 2-3 person AI manju team as a reusable
 | 1 | Bind `JellyfishRecordMapper` and `ClosedLoopProductionPlanner` to a real Jellyfish fork/API client. |
 | 2 | Persist generated media, QA reports, retry decisions, and post-production results back into Jellyfish records. |
 | 3 | Add provider workers for `RenderRequest` and `PostProductionStep` execution. |
-| 4 | Expose batch, QA, retry, and final export controls in the Jellyfish studio UI. |
+| 4 | Move the lightweight LuminAI dashboard controls into the Jellyfish studio frontend. |
 
 ## Non-Goals For This Pass
 
