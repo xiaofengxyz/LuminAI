@@ -1,6 +1,7 @@
 import { Card, Button, Statistic, Row, Col, Progress, Space, Spin } from 'antd'
 import {
   CheckCircleOutlined,
+  ControlOutlined,
   ClockCircleOutlined,
   FileSearchOutlined,
   VideoCameraOutlined,
@@ -182,6 +183,9 @@ export function DashboardTab({ onSelectTab }: { onSelectTab: (tab: TabKey) => vo
           </div>
           <Space wrap>
             <Button onClick={() => onSelectTab('chapters')}>进入章节管理</Button>
+            <Button icon={<ControlOutlined />} onClick={() => onSelectTab('filmCore')}>
+              Film Core
+            </Button>
             <Button onClick={() => projectId && navigate(getProjectEditorPath(projectId))}>进入后期剪辑</Button>
             <Button
               type="primary"

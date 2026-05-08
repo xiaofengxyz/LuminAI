@@ -71,6 +71,94 @@ function notFound(message = 'Not found') {
   )
 }
 
+function buildIndustrialOverview(projectId: string) {
+  return {
+    workflow_mode: 'jellyfish_native_industrial_closed_loop',
+    project: {
+      id: projectId,
+      name: projectsList.find((p) => p.id === projectId)?.name ?? 'Mock Project',
+      style: '真人都市',
+      visual_style: '现实',
+      seed: 42,
+      unify_style: true,
+    },
+    chapter: null,
+    industrial_score: 75,
+    pipeline: [
+      ['novel_script', 'Novel / Script', 'done'],
+      ['story_graph', 'Story Graph', 'done'],
+      ['director_planner', 'Director Planner', 'warning'],
+      ['film_core', 'Film Core', 'warning'],
+      ['prompt_compiler', 'Prompt Compiler', 'ready'],
+      ['runtime_adapter', 'Runtime Adapter', 'ready'],
+      ['render_runtime', 'Render Runtime', 'waiting'],
+      ['video_models', 'Video Models', 'ready'],
+      ['qa_engine', 'QA Engine', 'waiting'],
+      ['retry_engine', 'Retry Engine', 'waiting'],
+      ['final_editing', 'Final Editing', 'blocked'],
+    ].map(([key, title, status]) => ({
+      key,
+      title,
+      status,
+      owner: key === 'film_core' ? 'LuminAI Film Core' : 'Jellyfish',
+      description: `${title} mock stage`,
+      evidence: 'mock evidence',
+      next_action: '继续补齐工业闭环所需资产与镜头状态。',
+    })),
+    asset_health: {
+      identity_score: 70,
+      scene_score: 65,
+      prop_score: 55,
+      costume_score: 60,
+      pending_candidate_count: 2,
+      pending_dialogue_count: 1,
+      summary: 'needs_locking',
+    },
+    qa_retry: {
+      qa_ready: false,
+      generated_or_accepted_videos: 0,
+      planned_retry_candidates: 3,
+      risk_level: 'high',
+      automatic_retry_enabled: true,
+      post_production_ready: false,
+    },
+    pain_points: [
+      {
+        key: 'character_consistency',
+        title: '角色脸和身份漂移',
+        severity: 'high',
+        diagnosis: 'mock identity lock incomplete',
+        solution: '为主要角色绑定演员形象和身份参考。',
+      },
+      {
+        key: 'costume_prop_drift',
+        title: '服装与道具漂移',
+        severity: 'medium',
+        diagnosis: 'mock costume and prop links incomplete',
+        solution: '把服装、道具作为资产绑定到角色和镜头。',
+      },
+    ],
+    reference_projects: [
+      {
+        name: 'Jellyfish',
+        url: 'https://github.com/Forget-C/Jellyfish',
+        adopted_layer: 'Studio OS / operator workspace',
+        rule: '继续作为主 UI、资产、分镜、任务中心和后期入口。',
+      },
+      {
+        name: 'ArcReel',
+        url: 'https://github.com/ArcReel/ArcReel',
+        adopted_layer: 'Novel-to-video consistency workflow',
+        rule: '参考长流程和资产库思路，在 Jellyfish 内落地。',
+      },
+    ],
+    operator_next_actions: [
+      { severity: 'high', action: '为主要角色绑定演员形象和身份参考。' },
+      { severity: 'medium', action: '对 ready 镜头创建批量视频生成任务。' },
+    ],
+  }
+}
+
 function toProjectRead(p: Project) {
   return {
     id: p.id,
@@ -97,6 +185,51 @@ function toChapterRead(c: Chapter) {
 }
 
 export const handlers = [
+  // ====== Film Core industrial workflow ======
+  http.get('/api/v1/film/industrial/projects/:project_id/overview', ({ params }) => {
+    const { project_id } = params as { project_id: string }
+    return ok(buildIndustrialOverview(project_id))
+  }),
+
+  http.post('/api/v1/film/industrial/projects/:project_id/plan', async ({ params }) => {
+    const { project_id } = params as { project_id: string }
+    const overview = buildIndustrialOverview(project_id)
+    return ok({
+      plan_id: `industrial-${project_id}-mock`,
+      workflow: overview.pipeline.map((stage) => stage.key),
+      overview,
+      render_queue: [1, 2, 3].map((slot) => ({
+        slot,
+        shot_ref: `${project_id}-shot-${slot}`,
+        provider: 'runtime_adapter',
+        model: 'project_default_video_model',
+        output_path: `output/jellyfish-industrial/${project_id}/${slot}.mp4`,
+        references_required: ['character_identity', 'costume', 'scene_keyframe'],
+        compiled_prompt_contract: {
+          source: 'Film Core state + Director DSL + Jellyfish assets',
+          must_include: ['character bible', 'costume lock', 'camera language'],
+        },
+      })),
+      qa_policy: {
+        face_similarity_min: 0.86,
+        outfit_similarity_min: 0.82,
+        clip_score_min: 0.28,
+        continuity_checks: ['character identity drift', 'costume drift', 'scene/light continuity'],
+      },
+      retry_policy: {
+        max_attempts: 3,
+        planned_retry_candidates: 3,
+        repair_patch_contract: ['increase identity reference strength', 'lower randomness'],
+      },
+      post_production: {
+        enabled: false,
+        steps: ['tts_alignment', 'subtitle_pack', 'shot_concat', 'bgm_mix', 'final_export'],
+        write_back_targets: ['files', 'generation_task_links', 'shots.generated_video_file_id'],
+      },
+      blockers: overview.operator_next_actions.filter((item) => item.severity === 'high'),
+    })
+  }),
+
   // ====== StudioProjectsService /api/v1/studio/projects ======
   http.get('/api/v1/studio/projects', ({ request }) => {
     const url = new URL(request.url)
@@ -604,5 +737,4 @@ export const handlers = [
     return HttpResponse.json(modelSettingsStore, { status: 200 })
   }),
 ]
-
 

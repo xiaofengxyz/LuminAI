@@ -18,6 +18,7 @@ import { CostumesTab, PropsTab } from './tabs/PropsTab'
 import { FilesTab } from './tabs/FilesTab'
 import { EditTab } from './tabs/EditTab'
 import { SettingsTab } from './tabs/SettingsTab'
+import { FilmCoreTab } from './tabs/FilmCoreTab'
 import { getChapterShotsPath, getChapterStudioPath, getProjectEditorPath } from './routes'
 import { useProject, useChapters } from './hooks/useProjectData'
 import { ensureHasShotsBeforeShooting } from './ensureHasShotsBeforeShooting'
@@ -231,6 +232,7 @@ const ProjectWorkbench: React.FC = () => {
         {activeTab === 'dashboard' && <DashboardTab onSelectTab={setTabInUrl} />}
 
         {activeTab === 'chapters' && <ChaptersTab />}
+        {activeTab === 'filmCore' && <FilmCoreTab />}
 
         {activeTab === 'actors' && <ActorsTab />}
         {activeTab === 'roles' && <RolesTab />}
