@@ -6,6 +6,7 @@ import {
   EllipsisOutlined,
   ArrowLeftOutlined,
   VideoCameraFilled,
+  DeploymentUnitOutlined,
 } from '@ant-design/icons'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { TAB_CONFIG, type TabKey, isTabKey, DEFAULT_TAB } from './constants'
@@ -205,6 +206,11 @@ const ProjectWorkbench: React.FC = () => {
             }))}
           />
           <Space size="small" wrap className="shrink-0">
+            {activeTab !== 'filmCore' && (
+              <Button icon={<DeploymentUnitOutlined />} onClick={() => setTabInUrl('filmCore')}>
+                Film Core
+              </Button>
+            )}
             <Button
               type="primary"
               icon={primaryCta.icon}

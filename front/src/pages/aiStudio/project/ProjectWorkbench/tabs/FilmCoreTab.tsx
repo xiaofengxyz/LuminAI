@@ -29,6 +29,7 @@ import {
   loadIndustrialOverview,
   type FilmIndustrialOverview,
   type FilmIndustrialPlan,
+  type FilmImplementationPhase,
   type FilmPipelineStage,
 } from '../../../../../services/industrialFilm'
 
@@ -75,6 +76,10 @@ function timelineColor(stage: FilmPipelineStage) {
   return 'gray'
 }
 
+function phaseTag(phase: FilmImplementationPhase) {
+  return <Tag color={phase.status === 'done' ? 'green' : 'gold'}>{phase.status === 'done' ? '已完成' : phase.status}</Tag>
+}
+
 export function FilmCoreTab() {
   const { projectId } = useParams<{ projectId: string }>()
   const [overview, setOverview] = useState<FilmIndustrialOverview | null>(null)
@@ -87,6 +92,12 @@ export function FilmCoreTab() {
     () => overview?.operator_next_actions.filter((item) => item.severity === 'high') ?? [],
     [overview],
   )
+  const phasePercent = useMemo(() => {
+    if (!overview?.implementation_status.total_phases) return 0
+    return Math.round(
+      (overview.implementation_status.completed_phases / overview.implementation_status.total_phases) * 100,
+    )
+  }, [overview])
 
   const refresh = async () => {
     if (!projectId) return
@@ -206,15 +217,49 @@ export function FilmCoreTab() {
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card size="small">
-            <Statistic title="流程节点" value={overview.pipeline.length} prefix={<ControlOutlined />} />
-            <Text type="secondary">从剧本到最终剪辑</Text>
+            <Statistic
+              title="九阶段完成"
+              value={overview.implementation_status.completed_phases}
+              suffix={`/ ${overview.implementation_status.total_phases}`}
+              prefix={<ControlOutlined />}
+            />
+            <Text type="secondary">{overview.implementation_status.status === 'complete' ? '已全部落地' : '继续推进中'}</Text>
           </Card>
         </Col>
       </Row>
 
+      <Card
+        title="九阶段交付状态"
+        size="small"
+        extra={<Tag color={overview.implementation_status.status === 'complete' ? 'green' : 'gold'}>{overview.implementation_status.label}</Tag>}
+      >
+        <div className="mb-3">
+          <Progress percent={phasePercent} size="small" />
+          <Text type="secondary">{overview.implementation_status.evidence}</Text>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          {overview.implementation_phases.map((phase) => (
+            <div key={phase.key} className="rounded border border-gray-100 bg-gray-50 px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <Space size="small" wrap>
+                  <span className="text-xs font-medium text-gray-500">{phase.phase}</span>
+                  {phaseTag(phase)}
+                </Space>
+                <Text type="secondary" className="text-xs">
+                  {phase.owner}
+                </Text>
+              </div>
+              <div className="mt-1 font-medium text-gray-900">{phase.title}</div>
+              <div className="mt-1 text-xs text-gray-600">{phase.evidence}</div>
+              <div className="mt-1 text-xs text-gray-500">{phase.surface}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={14}>
-          <Card title="生产闭环" size="small">
+          <Card title={`生产闭环 · ${overview.pipeline.length} 个运行节点`} size="small">
             <Timeline
               items={overview.pipeline.map((stage) => ({
                 color: timelineColor(stage),

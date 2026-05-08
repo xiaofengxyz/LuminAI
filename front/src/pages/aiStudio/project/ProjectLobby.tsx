@@ -25,6 +25,7 @@ import {
   AppstoreOutlined,
   UnorderedListOutlined,
   BarsOutlined,
+  DeploymentUnitOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { chapters as mockChapters, projects as mockProjects, type Project } from '../../../mocks/data'
@@ -37,7 +38,7 @@ import {
 import { useProjectStyleOptions } from './useProjectStyleOptions'
 import { getChapterPreparationState } from './ProjectWorkbench/chapterPreparation'
 import { ensureHasShotsBeforeShooting } from './ProjectWorkbench/ensureHasShotsBeforeShooting'
-import { getChapterShotsPath, getChapterStudioPath } from './ProjectWorkbench/routes'
+import { getChapterShotsPath, getChapterStudioPath, getProjectFilmCorePath } from './ProjectWorkbench/routes'
 import { loadProjectFlowStatsForChapters, type ProjectFlowStats } from './ProjectWorkbench/projectFlowStats'
 
 type ViewMode = 'grid' | 'compact' | 'large'
@@ -696,6 +697,15 @@ const ProjectLobby: React.FC = () => {
                 <Button
                   type="text"
                   size="small"
+                  icon={<DeploymentUnitOutlined />}
+                  onClick={() => navigate(getProjectFilmCorePath(p.id))}
+                  className="text-[11px]"
+                >
+                  Film Core
+                </Button>
+                <Button
+                  type="text"
+                  size="small"
                   icon={<EditOutlined />}
                   onClick={(e) => handleOpenEdit(e, p)}
                   className="text-[11px]"
@@ -940,6 +950,15 @@ const ProjectLobby: React.FC = () => {
                     className="text-[11px]"
                   >
                     进入章节工作台
+                  </Button>
+                  <Button
+                    block
+                    size="small"
+                    icon={<DeploymentUnitOutlined />}
+                    onClick={() => navigate(getProjectFilmCorePath(selectedProject.id))}
+                    className="text-[11px]"
+                  >
+                    Film Core 状态
                   </Button>
                 </div>
               ) : (

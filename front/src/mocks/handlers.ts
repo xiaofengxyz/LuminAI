@@ -72,6 +72,26 @@ function notFound(message = 'Not found') {
 }
 
 function buildIndustrialOverview(projectId: string) {
+  const implementationPhases = [
+    ['phase_1_foundation', 'Phase 1', 'Package Skeleton / Domain Foundation'],
+    ['phase_2_comic_pipeline', 'Phase 2', 'Comic Generation Pipeline'],
+    ['phase_3_runtime_adapters', 'Phase 3', 'Runtime Adapters'],
+    ['phase_4_film_primitives', 'Phase 4', 'Industrial Film Primitives'],
+    ['phase_5_platform_bridge', 'Phase 5', 'Jellyfish Platform Bridge'],
+    ['phase_6_record_mapping', 'Phase 6', 'Jellyfish Record/API Mapping'],
+    ['phase_7_post_production', 'Phase 7', 'Post-Production Runtime Graft'],
+    ['phase_8_director_consistency', 'Phase 8', 'Director And Consistency Layers'],
+    ['phase_9_qa_retry_batch', 'Phase 9', 'QA / Retry / Batch Closure'],
+  ].map(([key, phase, title]) => ({
+    key,
+    phase,
+    title,
+    owner: 'LuminAI',
+    status: 'done',
+    evidence: `${title} mock implementation evidence is available.`,
+    surface: 'LuminAI Film Core + Jellyfish Workbench',
+  }))
+
   return {
     workflow_mode: 'jellyfish_native_industrial_closed_loop',
     project: {
@@ -156,6 +176,14 @@ function buildIndustrialOverview(projectId: string) {
       { severity: 'high', action: '为主要角色绑定演员形象和身份参考。' },
       { severity: 'medium', action: '对 ready 镜头创建批量视频生成任务。' },
     ],
+    implementation_status: {
+      total_phases: implementationPhases.length,
+      completed_phases: implementationPhases.length,
+      status: 'complete',
+      label: `${implementationPhases.length}/${implementationPhases.length} starter-kit phases complete`,
+      evidence: 'Mock Film Core overview exposes all nine implemented starter-kit phases.',
+    },
+    implementation_phases: implementationPhases,
   }
 }
 
@@ -737,4 +765,3 @@ export const handlers = [
     return HttpResponse.json(modelSettingsStore, { status: 200 })
   }),
 ]
-

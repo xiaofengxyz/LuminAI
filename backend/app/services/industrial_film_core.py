@@ -114,6 +114,91 @@ REFERENCE_PROJECTS: list[dict[str, str]] = [
 ]
 
 
+IMPLEMENTATION_PHASES: list[dict[str, str]] = [
+    {
+        "key": "phase_1_foundation",
+        "phase": "Phase 1",
+        "title": "Package Skeleton / Domain Foundation",
+        "owner": "LuminAI Core",
+        "status": "done",
+        "evidence": "Python package skeleton, Pydantic domain models, provider registry, and media reference resolver are implemented.",
+        "surface": "src/apps/comic_gen, src/models, src/utils, tests/test_provider_registry.py",
+    },
+    {
+        "key": "phase_2_comic_pipeline",
+        "phase": "Phase 2",
+        "title": "Comic Generation Pipeline",
+        "owner": "Series Factory",
+        "status": "done",
+        "evidence": "Series/episode asset inheritance, prompt fallback, local snapshots, and provider routing are covered by tests.",
+        "surface": "src/apps/comic_gen, tests/test_series.py, tests/test_local_only_flow.py",
+    },
+    {
+        "key": "phase_3_runtime_adapters",
+        "phase": "Phase 3",
+        "title": "Runtime Adapters",
+        "owner": "Runtime Abstraction",
+        "status": "done",
+        "evidence": "Wan/DashScope, Kling, Vidu, image references, video params, and media routing stay behind adapter contracts.",
+        "surface": "src/models, src/utils/provider_media.py, tests/test_*provider*_routing.py",
+    },
+    {
+        "key": "phase_4_film_primitives",
+        "phase": "Phase 4",
+        "title": "Industrial Film Primitives",
+        "owner": "Film Core",
+        "status": "done",
+        "evidence": "ECS-inspired registries, workflow graph, film state, prompt compiler, QA, retry, and batch planning are implemented.",
+        "surface": "src/film_engine/{ecs,graph,state,prompt_compiler,qa,retry,batch}.py",
+    },
+    {
+        "key": "phase_5_platform_bridge",
+        "phase": "Phase 5",
+        "title": "Jellyfish Platform Bridge",
+        "owner": "Platform Boundary",
+        "status": "done",
+        "evidence": "Project/chapter/shot/asset/task contracts map into Film Core render and continuity boundaries.",
+        "surface": "src/film_engine/platform.py, tests/test_jellyfish_platform_bridge.py",
+    },
+    {
+        "key": "phase_6_record_mapping",
+        "phase": "Phase 6",
+        "title": "Jellyfish Record/API Mapping",
+        "owner": "Jellyfish Mapper",
+        "status": "done",
+        "evidence": "Real Jellyfish-shaped records can be converted without importing ORM models into the Film Core.",
+        "surface": "src/film_engine/jellyfish.py, tests/test_jellyfish_record_mapper.py",
+    },
+    {
+        "key": "phase_7_post_production",
+        "phase": "Phase 7",
+        "title": "Post-Production Runtime Graft",
+        "owner": "Post Pipeline",
+        "status": "done",
+        "evidence": "TTS, subtitle, FFmpeg compose, concat, and final export steps are planned as runtime-neutral work.",
+        "surface": "src/film_engine/post_production.py, tests/test_post_production_planner.py",
+    },
+    {
+        "key": "phase_8_director_consistency",
+        "phase": "Phase 8",
+        "title": "Director And Consistency Layers",
+        "owner": "Director DSL Layer",
+        "status": "done",
+        "evidence": "Director rules, character/scene bibles, consistency context, and prompt compiler handoff are implemented.",
+        "surface": "src/film_engine/director.py, tests/test_director_consistency.py",
+    },
+    {
+        "key": "phase_9_qa_retry_batch",
+        "phase": "Phase 9",
+        "title": "QA / Retry / Batch Closure",
+        "owner": "Closed-Loop Production",
+        "status": "done",
+        "evidence": "Closed-loop chapter planning exposes render requests, QA reports, retry requests, and post-production planning.",
+        "surface": "src/film_engine/production.py, tests/test_closed_loop_production.py",
+    },
+]
+
+
 @dataclass(frozen=True)
 class IndustrialProjectSnapshot:
     project_id: str
@@ -165,6 +250,8 @@ class IndustrialProjectSnapshot:
 
 
 def build_industrial_overview(snapshot: IndustrialProjectSnapshot) -> dict[str, Any]:
+    """Build the operator-facing Film Core overview from a Jellyfish snapshot."""
+
     stages = _build_stage_index(snapshot)
     pain_points = _build_pain_points(snapshot)
     asset_health = _build_asset_health(snapshot)
@@ -195,6 +282,22 @@ def build_industrial_overview(snapshot: IndustrialProjectSnapshot) -> dict[str, 
         "pain_points": pain_points,
         "reference_projects": REFERENCE_PROJECTS,
         "operator_next_actions": next_actions,
+        "implementation_status": build_implementation_status(),
+        "implementation_phases": IMPLEMENTATION_PHASES,
+    }
+
+
+def build_implementation_status() -> dict[str, Any]:
+    """Summarize the nine starter-kit implementation phases for the UI."""
+
+    total = len(IMPLEMENTATION_PHASES)
+    completed = sum(1 for item in IMPLEMENTATION_PHASES if item["status"] == "done")
+    return {
+        "total_phases": total,
+        "completed_phases": completed,
+        "status": "complete" if completed == total else "in_progress",
+        "label": f"{completed}/{total} starter-kit phases complete",
+        "evidence": "The nine implementation phases are implemented in LuminAI core modules; Jellyfish-native Film Core UI/API is the product surface that shows them.",
     }
 
 
@@ -205,6 +308,8 @@ def build_closed_loop_plan(
     model: str = "project_default_video_model",
     output_dir: str = "output/jellyfish-industrial",
 ) -> dict[str, Any]:
+    """Build a runtime-neutral closed-loop plan preview for one project scope."""
+
     overview = build_industrial_overview(snapshot)
     shot_slots = max(snapshot.shot_count, snapshot.ready_shot_count, snapshot.generated_video_count)
     render_queue = [

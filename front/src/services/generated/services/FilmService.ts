@@ -2,6 +2,8 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { ApiResponse_FilmIndustrialOverviewRead_ } from '../models/ApiResponse_FilmIndustrialOverviewRead_';
+import type { ApiResponse_FilmIndustrialPlanRead_ } from '../models/ApiResponse_FilmIndustrialPlanRead_';
 import type { ApiResponse_GenerationTaskLinkRead_ } from '../models/ApiResponse_GenerationTaskLinkRead_';
 import type { ApiResponse_NoneType_ } from '../models/ApiResponse_NoneType_';
 import type { ApiResponse_PaginatedData_GenerationTaskLinkRead__ } from '../models/ApiResponse_PaginatedData_GenerationTaskLinkRead__';
@@ -12,6 +14,7 @@ import type { ApiResponse_TaskLinkAdoptRead_ } from '../models/ApiResponse_TaskL
 import type { ApiResponse_TaskResultRead_ } from '../models/ApiResponse_TaskResultRead_';
 import type { ApiResponse_TaskStatusRead_ } from '../models/ApiResponse_TaskStatusRead_';
 import type { ApiResponse_VideoPromptPreviewResponse_ } from '../models/ApiResponse_VideoPromptPreviewResponse_';
+import type { FilmIndustrialPlanRequest } from '../models/FilmIndustrialPlanRequest';
 import type { GenerationTaskLinkCreate } from '../models/GenerationTaskLinkCreate';
 import type { GenerationTaskLinkUpdate } from '../models/GenerationTaskLinkUpdate';
 import type { ShotFramePromptRequest } from '../models/ShotFramePromptRequest';
@@ -23,6 +26,62 @@ import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
 export class FilmService {
+    /**
+     * 工业电影级 Film Core 总览
+     * Return Film Core readiness, pipeline state, and nine-phase delivery evidence.
+     * @returns ApiResponse_FilmIndustrialOverviewRead_ Successful Response
+     * @throws ApiError
+     */
+    public static loadIndustrialOverview({
+        projectId,
+        chapterId,
+    }: {
+        projectId: string,
+        /**
+         * 可选章节 ID；为空时按项目聚合
+         */
+        chapterId?: (string | null),
+    }): CancelablePromise<ApiResponse_FilmIndustrialOverviewRead_> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/film/industrial/projects/{project_id}/overview',
+            path: {
+                'project_id': projectId,
+            },
+            query: {
+                'chapter_id': chapterId,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * 生成工业闭环生产计划预览
+     * Return a render, QA, retry, and post-production plan without executing runtime work.
+     * @returns ApiResponse_FilmIndustrialPlanRead_ Successful Response
+     * @throws ApiError
+     */
+    public static createIndustrialPlan({
+        projectId,
+        requestBody,
+    }: {
+        projectId: string,
+        requestBody: FilmIndustrialPlanRequest,
+    }): CancelablePromise<ApiResponse_FilmIndustrialPlanRead_> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/film/industrial/projects/{project_id}/plan',
+            path: {
+                'project_id': projectId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
     /**
      * 视频提示词预览
      * 预览视频生成的提示词与自动关联参考图。

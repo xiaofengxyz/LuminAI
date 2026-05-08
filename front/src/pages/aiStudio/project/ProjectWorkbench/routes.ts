@@ -18,3 +18,6 @@ export function getProjectEditorPath(projectId: string) {
   return `/projects/${projectId}/editor`
 }
 
+export function getProjectFilmCorePath(projectId: string) {
+  return `/projects/${projectId}?tab=filmCore`
+}

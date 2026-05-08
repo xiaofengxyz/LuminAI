@@ -102,6 +102,24 @@ class FilmNextActionRead(BaseModel):
     action: str
 
 
+class FilmImplementationStatusRead(BaseModel):
+    total_phases: int
+    completed_phases: int
+    status: str
+    label: str
+    evidence: str
+
+
+class FilmImplementationPhaseRead(BaseModel):
+    key: str
+    phase: str
+    title: str
+    owner: str
+    status: str
+    evidence: str
+    surface: str
+
+
 class FilmIndustrialOverviewRead(BaseModel):
     workflow_mode: str
     project: FilmProjectBriefRead
@@ -113,6 +131,8 @@ class FilmIndustrialOverviewRead(BaseModel):
     pain_points: list[FilmPainPointRead]
     reference_projects: list[FilmReferenceProjectRead]
     operator_next_actions: list[FilmNextActionRead]
+    implementation_status: FilmImplementationStatusRead
+    implementation_phases: list[FilmImplementationPhaseRead]
 
 
 class FilmCompiledPromptContractRead(BaseModel):
@@ -171,12 +191,15 @@ class FilmIndustrialPlanRequest(BaseModel):
     "/projects/{project_id}/overview",
     response_model=ApiResponse[FilmIndustrialOverviewRead],
     summary="工业电影级 Film Core 总览",
+    operation_id="loadIndustrialOverview",
 )
 async def get_industrial_overview(
     project_id: str,
     chapter_id: str | None = Query(None, description="可选章节 ID；为空时按项目聚合"),
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse[FilmIndustrialOverviewRead]:
+    """Return Film Core readiness, pipeline state, and nine-phase delivery evidence."""
+
     snapshot = await load_industrial_snapshot(db, project_id=project_id, chapter_id=chapter_id)
     payload = FilmIndustrialOverviewRead.model_validate(build_industrial_overview(snapshot))
     return success_response(payload)
@@ -186,12 +209,15 @@ async def get_industrial_overview(
     "/projects/{project_id}/plan",
     response_model=ApiResponse[FilmIndustrialPlanRead],
     summary="生成工业闭环生产计划预览",
+    operation_id="createIndustrialPlan",
 )
 async def create_industrial_plan(
     project_id: str,
     body: FilmIndustrialPlanRequest,
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse[FilmIndustrialPlanRead]:
+    """Return a render, QA, retry, and post-production plan without executing runtime work."""
+
     snapshot = await load_industrial_snapshot(db, project_id=project_id, chapter_id=body.chapter_id)
     payload = FilmIndustrialPlanRead.model_validate(
         build_closed_loop_plan(
