@@ -34,10 +34,10 @@
 
 | Case | Command / Test | Expected result |
 | --- | --- | --- |
-| Industrial service contract | `python3 -m pytest -q -s tests/test_jellyfish_industrial_film_core.py` | Overview maps Jellyfish state into all 11 pipeline stages and plan exposes render, QA, retry, and post-production contracts. |
+| Industrial service contract | `python3 -m pytest -q -s tests/test_jellyfish_industrial_film_core.py` | Overview maps Jellyfish state into all 11 pipeline stages, exposes 9/9 starter-kit implementation phases, and plan exposes render, QA, retry, and post-production contracts. |
 | Backend route import | `PYTHONPATH=. .venv/bin/python -c "from app.api.v1.routes.film.industrial import router; print(len(router.routes))"` from `vendor/jellyfish/backend` | Prints `2`, covering overview and plan endpoints. |
-| Frontend type safety | `npx pnpm@9.15.9 run typecheck` from `vendor/jellyfish/front` | Project Workbench `Film Core` tab, manual service client, and mock handlers typecheck. |
-| Manual UI smoke | Open `/projects/{projectId}?tab=filmCore` in Jellyfish frontend | Film Core tab shows stage index, consistency health, pain-point diagnosis, plan button, and reference project breakdown inside the existing Jellyfish workbench. |
+| Frontend type safety | `npx pnpm@9.15.9 run typecheck` from `vendor/jellyfish/front` | Project Workbench `Film Core` tab, OpenAPI generated client wrapper, and mock handlers typecheck. |
+| Manual UI smoke | Open `/projects/{projectId}?tab=filmCore` in Jellyfish frontend | Film Core tab shows `九阶段交付状态`, 11-node production pipeline, consistency health, pain-point diagnosis, plan button, and reference project breakdown inside the existing Jellyfish workbench. |
 
 ## 5. Provider And Runtime Tests
 
@@ -82,8 +82,10 @@ Check:
 - shot workbench renders two demo render requests
 - one retry request is visible through the failed shot
 - Jellyfish base panel shows path, commit, ports, and Docker command
-- Jellyfish Project Workbench `Film Core` tab renders the industrial pipeline
-  inside the existing Jellyfish UI
+- Jellyfish project cards, preview side panel, and workbench header expose direct
+  Film Core entry points
+- Jellyfish Project Workbench `Film Core` tab renders 9/9 implementation
+  phases plus the industrial production pipeline inside the existing Jellyfish UI
 
 ## 8. Current Known Limits
 

@@ -2,6 +2,17 @@
 
 Current task: Implement the industrial AI film engine requirements inside the existing Jellyfish UI/backend, keep a single-agent execution path, update progress continuously, test, run, clean, resolve conflicts, and push necessary changes.
 
+## Session 2026-05-08 - Film Core Visibility And Nine-Phase Evidence
+
+| Node | Status | Evidence |
+| --- | --- | --- |
+| 1. Plan and baseline review | Done | Planned single-agent execution; confirmed root `main...origin/main` and Jellyfish submodule branch were clean; reviewed current Film Core tab, industrial backend service, generated OpenAPI state, task index, and documentation. |
+| 2. Film Core visibility | Done | Added direct entry points from project cards, project preview side panel, and Project Workbench header; canonical URL is `/projects/{project_id}?tab=filmCore`. |
+| 3. Nine-phase product evidence | Done | Added `implementation_status` and `implementation_phases` to the industrial overview contract; Film Core tab now renders `九阶段交付状态` as 9/9 complete while keeping the 11-node production pipeline separate. |
+| 4. Modular API/client implementation | Done | Kept backend logic in `app/services/industrial_film_core.py`, route models in `app/api/v1/routes/film/industrial.py`, regenerated OpenAPI client, and changed `front/src/services/industrialFilm.ts` to wrap generated `FilmService` instead of hand-written HTTP calls. |
+| 5. Tests and docs | Done | Added service/UI source tests in `tests/test_jellyfish_industrial_film_core.py`; updated README, architecture, execution plan, Jellyfish blueprint, project manual, Jellyfish site architecture docs, and test cases. |
+| 6. Verification, run, cleanup, push | Done | `python3 -m pytest -q -s tests/test_jellyfish_industrial_film_core.py` passed 5 tests; root `python3 -m pytest -q -s` passed 144 tests; backend route import printed `2`; live smoke overview returned HTTP 200 with `9/9` phases and 11 pipeline nodes; frontend `npx pnpm@9.15.9 run typecheck` and `run build` passed; conflict scan and `git diff --check` passed. Services are running at Jellyfish backend `http://127.0.0.1:8011`, Jellyfish frontend `http://localhost:7790/`, and LuminAI runtime `http://127.0.0.1:8766/` because 8000 and 8765 were already occupied. Jellyfish submodule commit `9cd28aa` was pushed to `origin/vendor-jellyfish-industrial-film-core`. |
+
 ## Session 2026-05-08 - Jellyfish Native Industrial Film Core
 
 | Node | Status | Evidence |

@@ -47,7 +47,9 @@ production. The bridge keeps the fork/API schema replaceable.
 The tracked upstream base lives at `vendor/jellyfish`. LuminAI still exposes a
 small local dashboard for run-readiness, and the production-facing Film Core
 overview now lives inside Jellyfish through `/api/v1/film/industrial/...` and
-the Project Workbench `Film Core` tab.
+the Project Workbench `Film Core` tab. The same tab surfaces both the starter-kit
+`9/9` implementation completion evidence and the 11-node industrial production
+pipeline.
 
 ## Key Principles
 

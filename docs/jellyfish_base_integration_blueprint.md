@@ -198,8 +198,12 @@ generation, QA, and retry.
 | Phase 5 | Done | Added runtime-neutral post-production planning for TTS, subtitles, FFmpeg single-shot compose, multi-shot concat, and final export. |
 | Phase 6 | Done | Added backend director rules, character/scene bible consistency contracts, QA/retry/batch closure, and dependency-light run-readiness endpoints before UI binding. |
 | Phase 7 | Done | Added a real upstream Jellyfish submodule, Jellyfish base inspector, local Studio Dashboard UI, and status APIs. |
-| Phase 8 | Done | Added Jellyfish-native industrial Film Core overview and plan-preview APIs plus a Project Workbench `Film Core` tab. |
-| Phase 9 | Next | Persist generated media, QA reports, retry decisions, and post-production outcomes back to live Jellyfish records and task links. |
+| Phase 8 | Done | Added Jellyfish-native industrial Film Core overview and plan-preview APIs plus a Project Workbench `Film Core` tab. The tab now surfaces the starter-kit `9/9` implementation evidence and the 11-node production pipeline. |
+| Product Follow-up | Next | Persist generated media, QA reports, retry decisions, and post-production outcomes back to live Jellyfish records and task links. |
+
+The starter-kit nine implementation phases are complete. Their evidence is
+available in the Jellyfish `Film Core` tab through the
+`implementation_status` and `implementation_phases` overview fields.
 
 ---
 

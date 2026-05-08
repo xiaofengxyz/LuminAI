@@ -60,7 +60,24 @@ The report identifies the real moat for a 2-3 person AI manju team as a reusable
 | Phase 8 | Done | `src/film_engine/director.py` validates Director DSL and prepares character/scene bible continuity context for prompt compilation. |
 | Phase 9 | Done | `src/film_engine/production.py` builds closed-loop chapter plans with render requests, QA reports, retry requests, and optional post-production planning. |
 | Phase 10 | Done | `vendor/jellyfish` tracks the real upstream Jellyfish base; `src/film_engine/studio.py` and `src/film_engine/server.py` expose the Studio Dashboard plus status APIs. |
-| Phase 11 | Done | Jellyfish backend exposes `/api/v1/film/industrial/...`; Jellyfish Project Workbench has a native `Film Core` tab for pipeline status, consistency health, QA/retry readiness, and plan preview. |
+| Phase 11 | Done | Jellyfish backend exposes `/api/v1/film/industrial/...`; Jellyfish Project Workbench has a native `Film Core` tab for 9/9 implementation evidence, pipeline status, consistency health, QA/retry readiness, and plan preview. |
+
+## Where The Nine Phases Are Visible
+
+The original nine implementation phases are complete and are now visible in the
+Jellyfish project workspace:
+
+```text
+Projects -> project card Film Core
+Projects -> project preview Film Core Status
+Project Workbench -> Film Core
+Direct URL -> /projects/{project_id}?tab=filmCore
+```
+
+The `Film Core` tab renders a `九阶段交付状态` panel from
+`implementation_status` and `implementation_phases` in the industrial overview
+API. The same tab separately renders the 11-node production pipeline from
+Novel / Script through Final Editing.
 
 ## 2026-05-08 Run Readiness Review Plan
 

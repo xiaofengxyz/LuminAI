@@ -113,6 +113,18 @@ The current implementation uses Jellyfish as the studio OS / workflow base and
 adds a native Project Workbench `Film Core` tab plus industrial Film Core APIs
 for continuity, prompt, QA, retry, and runtime abstraction planning.
 
+Film Core is visible inside Jellyfish at:
+
+```text
+Projects -> project card Film Core
+Projects -> project preview Film Core Status
+Project Workbench -> Film Core
+/projects/{projectId}?tab=filmCore
+```
+
+The tab shows both starter-kit `9/9` implementation completion evidence and the
+11-node production pipeline from script through final editing.
+
 Reference docs:
 
 - `docs/jellyfish_base_integration_blueprint.md`

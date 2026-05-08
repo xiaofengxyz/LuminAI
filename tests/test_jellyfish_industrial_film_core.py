@@ -95,8 +95,53 @@ def test_closed_loop_plan_exposes_render_qa_retry_and_post_contracts():
     assert any(blocker["severity"] == "high" for blocker in plan["blockers"])
 
 
+def test_industrial_overview_exposes_nine_implementation_phases():
+    snapshot = IndustrialProjectSnapshot(
+        project_id="proj-3",
+        project_name="Phase Evidence",
+        project_style="真人都市",
+        visual_style="现实",
+        seed=7,
+        unify_style=True,
+        script_text_length=800,
+        chapter_count=1,
+        shot_count=3,
+        ready_shot_count=3,
+        generated_video_count=1,
+        detail_count=3,
+        character_count=2,
+        actor_link_count=2,
+        scene_link_count=2,
+        prop_link_count=1,
+        costume_link_count=2,
+    )
+
+    overview = build_industrial_overview(snapshot)
+
+    assert overview["implementation_status"]["total_phases"] == 9
+    assert overview["implementation_status"]["completed_phases"] == 9
+    assert overview["implementation_status"]["status"] == "complete"
+    assert len(overview["implementation_phases"]) == 9
+    assert overview["implementation_phases"][0]["phase"] == "Phase 1"
+    assert overview["implementation_phases"][-1]["key"] == "phase_9_qa_retry_batch"
+
+
 def test_jellyfish_industrial_routes_are_registered():
     route_file = BACKEND_DIR / "app" / "api" / "v1" / "routes" / "film" / "__init__.py"
     route_source = route_file.read_text(encoding="utf-8")
 
     assert "industrial.router" in route_source
+
+
+def test_project_workbench_surfaces_film_core_from_lobby_and_generated_client():
+    front_dir = BACKEND_DIR.parent / "front" / "src"
+    lobby_source = (front_dir / "pages" / "aiStudio" / "project" / "ProjectLobby.tsx").read_text(encoding="utf-8")
+    routes_source = (
+        front_dir / "pages" / "aiStudio" / "project" / "ProjectWorkbench" / "routes.ts"
+    ).read_text(encoding="utf-8")
+    film_service_source = (front_dir / "services" / "industrialFilm.ts").read_text(encoding="utf-8")
+
+    assert "getProjectFilmCorePath" in routes_source
+    assert "Film Core 状态" in lobby_source
+    assert "FilmService" in film_service_source
+    assert "services/http" not in film_service_source

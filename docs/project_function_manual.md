@@ -313,6 +313,15 @@ Open a project and select:
 Project Workbench -> Film Core
 ```
 
+The same view is also reachable from:
+
+```text
+Projects -> Project Card -> Film Core
+Projects -> Project Preview -> Film Core Status
+Project Workbench Header -> Film Core
+Direct URL -> /projects/{project_id}?tab=filmCore
+```
+
 Backend endpoints:
 
 ```text
@@ -334,6 +343,17 @@ into:
 - QA Engine
 - Retry Engine
 - Final Editing
+
+The same overview now also exposes the starter-kit implementation evidence:
+
+```text
+implementation_status      9/9 complete
+implementation_phases      Phase 1 through Phase 9 with owner, evidence, and code/test surface
+```
+
+This is rendered in the `Film Core` tab as the `九阶段交付状态` panel, so the
+producer can see that the nine implementation phases are complete without
+opening repository docs.
 
 The plan endpoint returns a preview contract for render queue entries, QA
 thresholds, retry repair patches, post-production steps, and current blockers.
