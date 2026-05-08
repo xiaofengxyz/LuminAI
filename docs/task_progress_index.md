@@ -2,6 +2,16 @@
 
 Current task: Implement the industrial AI film engine requirements inside the existing Jellyfish UI/backend, keep a single-agent execution path, update progress continuously, test, run, clean, resolve conflicts, and push necessary changes.
 
+## Session 2026-05-08 - CORS And 8011 Film Core Recovery
+
+| Node | Status | Evidence |
+| --- | --- | --- |
+| 1. Plan and baseline review | Done | Planned single-agent execution; confirmed root `main...origin/main` and Jellyfish submodule `main...origin/vendor-jellyfish-industrial-film-core`; reviewed backend CORS settings, frontend OpenAPI/http runtime config, `env.js`, Film Core tab service, and existing task index. |
+| 2. CORS and port root cause | Done | Found frontend runtime defaults still forced `http://localhost:8000`, while recent Jellyfish backend run path is `http://localhost:8011`; backend CORS defaults only listed `7788`, so a frontend on `7790` was not explicitly covered. |
+| 3. Implementation | Done | Added backend `cors_origin_regex` for localhost/127.0.0.1 dev ports, explicit `7790` origins, and CORSMiddleware regex wiring; added frontend `runtimeConfig.ts` so OpenAPI/http/assets share the `http://localhost:8011` default; updated `env.js`, OpenAPI fetch script, Jellyfish base status, and docs. |
+| 4. Tests and docs | Done | Added root source-contract tests and Jellyfish backend FastAPI CORS tests for `/api/v1/studio/projects` and `/api/v1/film/tasks?recent_seconds=15&page=1&page_size=50`; updated test-case docs and aligned backend response-envelope tests with current `meta: null` contract. |
+| 5. Verification and push | In Progress | Root targeted tests passed 10; root full `python3 -m pytest -q -s` passed 146; Jellyfish backend CORS suite passed 3; backend API suite passed 29; backend full `.venv/bin/python -m pytest -q -s` passed 284; frontend `npx pnpm@9.15.9 run typecheck` and `run build` passed. Cleanup, conflict scans, commit, and push are next. |
+
 ## Session 2026-05-08 - Film Core Visibility And Nine-Phase Evidence
 
 | Node | Status | Evidence |

@@ -38,6 +38,8 @@
 | Backend route import | `PYTHONPATH=. .venv/bin/python -c "from app.api.v1.routes.film.industrial import router; print(len(router.routes))"` from `vendor/jellyfish/backend` | Prints `2`, covering overview and plan endpoints. |
 | Frontend type safety | `npx pnpm@9.15.9 run typecheck` from `vendor/jellyfish/front` | Project Workbench `Film Core` tab, OpenAPI generated client wrapper, and mock handlers typecheck. |
 | Manual UI smoke | Open `/projects/{projectId}?tab=filmCore` in Jellyfish frontend | Film Core tab shows `九阶段交付状态`, 11-node production pipeline, consistency health, pain-point diagnosis, plan button, and reference project breakdown inside the existing Jellyfish workbench. |
+| CORS and runtime backend | `python3 -m pytest -q -s tests/test_jellyfish_cors_runtime_config.py` | Frontend runtime defaults to Jellyfish backend `8011`; `/api/v1/studio/projects` and `/api/v1/film/tasks?recent_seconds=15&page=1&page_size=50` return CORS headers for local frontend port `7790`. |
+| Jellyfish backend regression | `.venv/bin/python -m pytest -q -s` from `vendor/jellyfish/backend` | Full backend suite passes, including CORS middleware, Studio APIs, task center, response envelopes, and video capability mapping. |
 
 ## 5. Provider And Runtime Tests
 
@@ -94,7 +96,7 @@ Check:
 - Jellyfish now has native Film Core overview and plan preview endpoints; live
   DB/API writeback for generated media, QA reports, retry decisions, and
   post-production outputs is the next product integration step.
-- In this session, Jellyfish Docker Compose full-stack startup was blocked by a
+- In an earlier session, Jellyfish Docker Compose full-stack startup was blocked by a
   Debian apt mirror `502/404` during backend image build. The verified fallback
-  run path is `uv` SQLite backend on port 8000 plus the built frontend image on
-  port 7788.
+  local run path is `uv` SQLite backend on port 8011 plus the Jellyfish frontend
+  on port 7788 or the next free Vite port such as 7790.

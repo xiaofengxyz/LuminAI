@@ -329,6 +329,11 @@ GET  /api/v1/film/industrial/projects/{project_id}/overview
 POST /api/v1/film/industrial/projects/{project_id}/plan
 ```
 
+Local frontend runtime defaults to Jellyfish backend `http://localhost:8011`.
+If Vite moves from `7788` to `7790` because the first port is occupied, backend
+CORS still allows the studio requests, including `/api/v1/studio/projects` and
+`/api/v1/film/tasks`.
+
 The overview endpoint maps live Jellyfish project/chapter/shot/asset/task state
 into:
 

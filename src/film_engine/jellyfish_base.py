@@ -11,6 +11,9 @@ from typing import Any
 JELLYFISH_UPSTREAM_URL = "https://github.com/Forget-C/Jellyfish"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_JELLYFISH_BASE_PATH = REPO_ROOT / "vendor" / "jellyfish"
+JELLYFISH_FRONTEND_URL = "http://localhost:7788"
+JELLYFISH_LOCAL_BACKEND_URL = "http://localhost:8011"
+JELLYFISH_DOCKER_BACKEND_URL = "http://localhost:8000"
 
 
 @dataclass
@@ -98,9 +101,11 @@ def inspect_jellyfish_base(
     site_dir = _optional_rel(path / "site")
 
     ports = {
-        "frontend": "http://localhost:7788",
-        "backend": "http://localhost:8000",
-        "backend_docs": "http://localhost:8000/docs",
+        "frontend": JELLYFISH_FRONTEND_URL,
+        "backend": JELLYFISH_LOCAL_BACKEND_URL,
+        "backend_docs": f"{JELLYFISH_LOCAL_BACKEND_URL}/docs",
+        "docker_backend": JELLYFISH_DOCKER_BACKEND_URL,
+        "docker_backend_docs": f"{JELLYFISH_DOCKER_BACKEND_URL}/docs",
         "mysql": "localhost:${MYSQL_PORT:-3306}",
         "redis": "localhost:${REDIS_PORT:-6379}",
         "rustfs": "http://localhost:${RUSTFS_PORT:-9000}",
@@ -108,6 +113,7 @@ def inspect_jellyfish_base(
     run_commands = _run_commands(rel_path)
     notes = [
         "Jellyfish is tracked as the studio OS base. LuminAI stays runtime-neutral below the platform boundary.",
+        "Local dev uses backend port 8011 so an existing service on 8000 does not shadow the Film Core API.",
         "Use port overrides if local Redis or MySQL is already bound on default ports.",
     ]
     if missing:
@@ -145,9 +151,9 @@ def _run_commands(rel_path: str) -> list[JellyfishRunCommand]:
                 "up -d --build"
             ),
             ports={
-                "frontend": "http://localhost:7788",
-                "backend": "http://localhost:8000",
-                "backend_docs": "http://localhost:8000/docs",
+                "frontend": JELLYFISH_FRONTEND_URL,
+                "backend": JELLYFISH_DOCKER_BACKEND_URL,
+                "backend_docs": f"{JELLYFISH_DOCKER_BACKEND_URL}/docs",
             },
             notes=[
                 "This starts Jellyfish frontend, backend, MySQL, Redis, RustFS, and worker services.",
@@ -160,16 +166,16 @@ def _run_commands(rel_path: str) -> list[JellyfishRunCommand]:
             cwd=f"{rel_path}/backend",
             command=(
                 "cp .env.example .env && uv sync && "
-                "uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+                "uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8011"
             ),
-            ports={"backend": "http://localhost:8000", "backend_docs": "http://localhost:8000/docs"},
+            ports={"backend": JELLYFISH_LOCAL_BACKEND_URL, "backend_docs": f"{JELLYFISH_LOCAL_BACKEND_URL}/docs"},
         ),
         JellyfishRunCommand(
             id="frontend_dev",
             label="Frontend local dev",
             cwd=f"{rel_path}/front",
             command="pnpm install && pnpm dev --host 0.0.0.0",
-            ports={"frontend": "http://localhost:7788"},
+            ports={"frontend": JELLYFISH_FRONTEND_URL},
         ),
     ]
 

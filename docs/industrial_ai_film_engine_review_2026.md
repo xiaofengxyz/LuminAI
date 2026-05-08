@@ -77,8 +77,10 @@ Expected Jellyfish ports:
 
 ```text
 Frontend: http://localhost:7788
-Backend:  http://localhost:8000
+Backend:  http://localhost:8000  (Docker Compose)
 Docs:     http://localhost:8000/docs
+Backend:  http://localhost:8011  (local dev / Film Core default)
+Docs:     http://localhost:8011/docs
 ```
 
 Run note from this session:
@@ -86,9 +88,9 @@ Run note from this session:
 - Docker Compose config validated.
 - Full Docker Compose startup was attempted, but backend image build hit Debian
   apt mirror `502/404` while installing base system packages.
-- Successful fallback run path: Jellyfish backend via `uv` + SQLite on
-  `http://127.0.0.1:8000/openapi.json`, and the already built Jellyfish frontend
-  image on `http://127.0.0.1:7788/`.
+- Current local fallback run path: Jellyfish backend via `uv` + SQLite on
+  `http://127.0.0.1:8011/openapi.json`, and the Jellyfish frontend on
+  `http://127.0.0.1:7788/` or the next free Vite port such as `7790`.
 
 ## 3. Current Open Source Baseline
 

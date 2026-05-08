@@ -103,9 +103,15 @@ Expected Jellyfish URLs:
 
 ```text
 Frontend: http://localhost:7788
-Backend:  http://localhost:8000
+Backend:  http://localhost:8000  (Docker Compose)
 Docs:     http://localhost:8000/docs
+Backend:  http://localhost:8011  (local dev / Film Core default)
+Docs:     http://localhost:8011/docs
 ```
+
+The checked-in frontend runtime config defaults to `http://localhost:8011` for
+local development so an unrelated service on port 8000 cannot shadow the
+Jellyfish Film Core API. Docker deployments can still override `BACKEND_URL`.
 
 ## Development Direction
 
