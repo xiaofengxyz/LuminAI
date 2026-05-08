@@ -299,3 +299,42 @@ Required fields:
 - commit / push result when requested
 
 Use the index as the handoff point after context compaction or future sessions.
+
+---
+
+## 10. Jellyfish-Native Film Core
+
+The industrial Film Core is now exposed inside the existing Jellyfish project
+workbench.
+
+Open a project and select:
+
+```text
+Project Workbench -> Film Core
+```
+
+Backend endpoints:
+
+```text
+GET  /api/v1/film/industrial/projects/{project_id}/overview
+POST /api/v1/film/industrial/projects/{project_id}/plan
+```
+
+The overview endpoint maps live Jellyfish project/chapter/shot/asset/task state
+into:
+
+- Novel / Script
+- Story Graph
+- Director Planner
+- Film Core
+- Prompt Compiler
+- Runtime Adapter
+- Render Runtime
+- Video Models
+- QA Engine
+- Retry Engine
+- Final Editing
+
+The plan endpoint returns a preview contract for render queue entries, QA
+thresholds, retry repair patches, post-production steps, and current blockers.
+It does not bypass Jellyfish UI or replace Jellyfish task/media records.

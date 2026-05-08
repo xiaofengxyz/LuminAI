@@ -1,6 +1,16 @@
 # LuminAI Task Progress Index
 
-Current task: Answer the UI/Jellyfish-base gaps, attach a real Jellyfish upstream base, expose an operable Studio Dashboard, document the film-grade product/architecture review, test, run, clean, commit, and push necessary changes without using sub-agents.
+Current task: Implement the industrial AI film engine requirements inside the existing Jellyfish UI/backend, keep a single-agent execution path, update progress continuously, test, run, clean, resolve conflicts, and push necessary changes.
+
+## Session 2026-05-08 - Jellyfish Native Industrial Film Core
+
+| Node | Status | Evidence |
+| --- | --- | --- |
+| 1. Plan and baseline review | Done | Confirmed clean `main...origin/main`; read the starter kit, Jellyfish README, current task index, backend film routes, project workbench UI, and existing LuminAI Film Core modules; identified the key gap as missing Jellyfish-native Film Core/QA/Retry/Post UI and API entry points. |
+| 2. Jellyfish backend industrial API | Done | Added `app/services/industrial_film_core.py` plus `/api/v1/film/industrial/projects/{project_id}/overview` and `/plan`; targeted `python3 -m pytest -q -s tests/test_jellyfish_industrial_film_core.py` passed 3 tests; route imports under Jellyfish backend `.venv` Python 3.12. |
+| 3. Jellyfish project workbench UI | Done | Added `front/src/services/industrialFilm.ts`, mock handlers, and an existing Project Workbench `Film Core` tab; dashboard now links into it; `npx pnpm@9.15.9 run typecheck` passed. |
+| 4. Product/architecture and test documentation | Done | Updated README, system architecture, execution plan, Jellyfish blueprint, project manual, industrial review, and test cases to mark Jellyfish-native Film Core overview/plan/UI as implemented and live writeback as next. |
+| 5. Verification, run, cleanup, commit, push | In Progress | Root `python3 -m pytest -q -s` passed 142 tests; backend route import prints `2`; frontend `npx pnpm@9.15.9 run typecheck` and `run build` passed; Jellyfish backend is running on `http://127.0.0.1:8011` and frontend on `http://localhost:7790/`; live smoke project overview/plan endpoints returned 200 and the smoke project was deleted; submodule implementation commit `b48a264` was pushed to LuminAI branch `vendor-jellyfish-industrial-film-core` after upstream Jellyfish denied write access. |
 
 ## Session 2026-05-08 - Jellyfish Base And Studio UI Closure
 

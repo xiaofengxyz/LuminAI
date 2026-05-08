@@ -1,3 +1,4 @@
 [submodule "vendor/jellyfish"]
 	path = vendor/jellyfish
-	url = https://github.com/Forget-C/Jellyfish
+	url = git@github.com:xiaofengxyz/LuminAI.git
+	branch = vendor-jellyfish-industrial-film-core

@@ -44,9 +44,10 @@ LuminAI Film Core should attach below that platform boundary and own continuity,
 Director DSL, prompt compilation, runtime abstraction, QA, retry, and batch
 production. The bridge keeps the fork/API schema replaceable.
 
-The tracked upstream base lives at `vendor/jellyfish`. LuminAI exposes its own
-local dashboard for run-readiness and stage evidence while the next product
-step moves these controls into the Jellyfish frontend and backend API records.
+The tracked upstream base lives at `vendor/jellyfish`. LuminAI still exposes a
+small local dashboard for run-readiness, and the production-facing Film Core
+overview now lives inside Jellyfish through `/api/v1/film/industrial/...` and
+the Project Workbench `Film Core` tab.
 
 ## Key Principles
 

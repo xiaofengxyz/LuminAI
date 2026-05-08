@@ -60,6 +60,7 @@ The report identifies the real moat for a 2-3 person AI manju team as a reusable
 | Phase 8 | Done | `src/film_engine/director.py` validates Director DSL and prepares character/scene bible continuity context for prompt compilation. |
 | Phase 9 | Done | `src/film_engine/production.py` builds closed-loop chapter plans with render requests, QA reports, retry requests, and optional post-production planning. |
 | Phase 10 | Done | `vendor/jellyfish` tracks the real upstream Jellyfish base; `src/film_engine/studio.py` and `src/film_engine/server.py` expose the Studio Dashboard plus status APIs. |
+| Phase 11 | Done | Jellyfish backend exposes `/api/v1/film/industrial/...`; Jellyfish Project Workbench has a native `Film Core` tab for pipeline status, consistency health, QA/retry readiness, and plan preview. |
 
 ## 2026-05-08 Run Readiness Review Plan
 
@@ -75,10 +76,9 @@ The report identifies the real moat for a 2-3 person AI manju team as a reusable
 
 | Priority | Delivery |
 | --- | --- |
-| 1 | Bind `JellyfishRecordMapper` and `ClosedLoopProductionPlanner` to a real Jellyfish fork/API client. |
-| 2 | Persist generated media, QA reports, retry decisions, and post-production results back into Jellyfish records. |
-| 3 | Add provider workers for `RenderRequest` and `PostProductionStep` execution. |
-| 4 | Move the lightweight LuminAI dashboard controls into the Jellyfish studio frontend. |
+| 1 | Persist generated media, QA reports, retry decisions, and post-production results back into Jellyfish records. |
+| 2 | Add provider workers for `RenderRequest` and `PostProductionStep` execution. |
+| 3 | Replace deterministic QA planning metrics with production CV/CLIP/face/outfit/light detectors. |
 
 ## Non-Goals For This Pass
 

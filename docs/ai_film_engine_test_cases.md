@@ -30,7 +30,16 @@
 | Director consistency | `python3 -m pytest -q -s tests/test_director_consistency.py` | Character and scene bible continuity is prepared before prompt compilation. |
 | Post production | `python3 -m pytest -q -s tests/test_post_production_planner.py` | TTS, subtitle, FFmpeg compose, concat, and export steps are planned. |
 
-## 4. Provider And Runtime Tests
+## 4. Jellyfish-Native Industrial Film Core Tests
+
+| Case | Command / Test | Expected result |
+| --- | --- | --- |
+| Industrial service contract | `python3 -m pytest -q -s tests/test_jellyfish_industrial_film_core.py` | Overview maps Jellyfish state into all 11 pipeline stages and plan exposes render, QA, retry, and post-production contracts. |
+| Backend route import | `PYTHONPATH=. .venv/bin/python -c "from app.api.v1.routes.film.industrial import router; print(len(router.routes))"` from `vendor/jellyfish/backend` | Prints `2`, covering overview and plan endpoints. |
+| Frontend type safety | `npx pnpm@9.15.9 run typecheck` from `vendor/jellyfish/front` | Project Workbench `Film Core` tab, manual service client, and mock handlers typecheck. |
+| Manual UI smoke | Open `/projects/{projectId}?tab=filmCore` in Jellyfish frontend | Film Core tab shows stage index, consistency health, pain-point diagnosis, plan button, and reference project breakdown inside the existing Jellyfish workbench. |
+
+## 5. Provider And Runtime Tests
 
 | Case | Command / Test | Expected result |
 | --- | --- | --- |
@@ -39,7 +48,7 @@
 | Kling routing | `python3 -m pytest -q -s tests/test_kling_provider_routing.py` | Kling requests are routed without leaking story logic into the provider. |
 | Vidu routing | `python3 -m pytest -q -s tests/test_vidu_provider_routing.py` | Vidu requests preserve runtime adapter contracts. |
 
-## 5. Full Regression
+## 6. Full Regression
 
 Run:
 
@@ -53,7 +62,7 @@ Expected:
 All tests pass.
 ```
 
-## 6. Manual Smoke Run
+## 7. Manual Smoke Run
 
 Start LuminAI:
 
@@ -73,13 +82,16 @@ Check:
 - shot workbench renders two demo render requests
 - one retry request is visible through the failed shot
 - Jellyfish base panel shows path, commit, ports, and Docker command
+- Jellyfish Project Workbench `Film Core` tab renders the industrial pipeline
+  inside the existing Jellyfish UI
 
-## 7. Current Known Limits
+## 8. Current Known Limits
 
 - Demo QA metrics are deterministic test metrics, not real CV detectors.
 - Real provider rendering requires credentials and worker binding.
-- Jellyfish and LuminAI are colocated now; live DB/API writeback is the next
-  product integration step.
+- Jellyfish now has native Film Core overview and plan preview endpoints; live
+  DB/API writeback for generated media, QA reports, retry decisions, and
+  post-production outputs is the next product integration step.
 - In this session, Jellyfish Docker Compose full-stack startup was blocked by a
   Debian apt mirror `502/404` during backend image build. The verified fallback
   run path is `uv` SQLite backend on port 8000 plus the built frontend image on

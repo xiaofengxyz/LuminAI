@@ -84,6 +84,11 @@ git submodule update --init --recursive
 python3 -m src.film_engine.jellyfish_base
 ```
 
+The submodule is based on upstream `https://github.com/Forget-C/Jellyfish` and
+is hosted on the LuminAI `vendor-jellyfish-industrial-film-core` branch so this
+repo can carry Jellyfish-native Film Core changes without requiring write access
+to the upstream project.
+
 Run the Jellyfish Docker stack when local ports are free, or use the included
 port overrides:
 
@@ -104,9 +109,9 @@ Docs:     http://localhost:8000/docs
 
 ## Development Direction
 
-The current implementation establishes the backend foundation. Product work
-should use Jellyfish as the studio OS / workflow base, then attach LuminAI Film
-Core as the continuity, prompt, QA, retry, and runtime abstraction layer.
+The current implementation uses Jellyfish as the studio OS / workflow base and
+adds a native Project Workbench `Film Core` tab plus industrial Film Core APIs
+for continuity, prompt, QA, retry, and runtime abstraction planning.
 
 Reference docs:
 
@@ -117,10 +122,7 @@ Reference docs:
 
 Next product layers should build on these systems instead of bypassing them:
 
-1. Bind the bridge to a real Jellyfish fork/API client.
-2. Write approved outputs, QA reports, retry outcomes, and post-production
+1. Write approved outputs, QA reports, retry outcomes, and post-production
    results back into Jellyfish media/task/shot records.
-3. Expose closed-loop QA, retry, post-production, and batch controls in the
-   studio UI.
-4. Add provider-specific workers that execute `RenderRequest` and
+2. Add provider-specific workers that execute `RenderRequest` and
    `PostProductionStep` records while keeping Film Core runtime-neutral.

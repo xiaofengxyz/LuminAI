@@ -198,7 +198,8 @@ generation, QA, and retry.
 | Phase 5 | Done | Added runtime-neutral post-production planning for TTS, subtitles, FFmpeg single-shot compose, multi-shot concat, and final export. |
 | Phase 6 | Done | Added backend director rules, character/scene bible consistency contracts, QA/retry/batch closure, and dependency-light run-readiness endpoints before UI binding. |
 | Phase 7 | Done | Added a real upstream Jellyfish submodule, Jellyfish base inspector, local Studio Dashboard UI, and status APIs. |
-| Phase 8 | Next | Bind the bridge and closed-loop planner to live Jellyfish backend APIs and write generated media, QA, retry, and post-production outcomes back to platform records. |
+| Phase 8 | Done | Added Jellyfish-native industrial Film Core overview and plan-preview APIs plus a Project Workbench `Film Core` tab. |
+| Phase 9 | Next | Persist generated media, QA reports, retry decisions, and post-production outcomes back to live Jellyfish records and task links. |
 
 ---
 
@@ -237,3 +238,6 @@ The Jellyfish-based LuminAI platform is acceptable when:
 - the local Studio Dashboard can start and expose health, stage evidence,
   Jellyfish base status, QA failures, retry requests, and a closed-loop demo
   plan without provider credentials
+- the existing Jellyfish Project Workbench exposes Film Core pipeline state,
+  consistency health, QA/retry readiness, and closed-loop plan preview without
+  launching a separate UI

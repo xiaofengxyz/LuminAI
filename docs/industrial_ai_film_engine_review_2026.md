@@ -153,7 +153,7 @@ industrial intelligence that makes outputs repeatable.
 | Manual QA | Production cannot rely on human review for every retry. | `RuleBasedQAEngine`, structured QA issues, retry decisions. |
 | Expensive retry chaos | Retry must patch specific prompts and parameters. | `RetryEngine`, repair hints, attempt limits. |
 | No final editing closure | Voice, subtitles, compose, concat, and export must be planned. | `PostProductionPlanner` and FFmpeg step compiler. |
-| No operator UI | Operators need stage, shot, QA, retry, and base status in one screen. | `src/film_engine/studio.py` and dashboard root route. |
+| No operator UI | Operators need stage, shot, QA, retry, and base status in the same production workspace. | Jellyfish Project Workbench `Film Core` tab plus `/api/v1/film/industrial/...`. |
 
 ## 6. Architecture From Zero
 
@@ -203,11 +203,21 @@ Key design rules:
 | Closed-loop planning | `src/film_engine/production.py`, `src/film_engine/demo.py` |
 | Final editing | `src/film_engine/post_production.py` |
 | Batch planning | `src/film_engine/batch.py` |
+| Jellyfish-native industrial API | `vendor/jellyfish/backend/app/services/industrial_film_core.py`, `vendor/jellyfish/backend/app/api/v1/routes/film/industrial.py` |
+| Jellyfish-native Film Core UI | `vendor/jellyfish/front/src/pages/aiStudio/project/ProjectWorkbench/tabs/FilmCoreTab.tsx`, `vendor/jellyfish/front/src/services/industrialFilm.ts` |
 
 ## 8. What Is Still Not Claimed Done
 
 The current repository now has an operable dashboard and a real Jellyfish base
 checkout, but it is not yet a fully integrated production deployment.
+
+Done in the Jellyfish-native pass:
+
+- exposed a typed industrial Film Core overview endpoint inside Jellyfish
+- exposed a closed-loop production plan preview endpoint inside Jellyfish
+- added a Project Workbench `Film Core` tab instead of a separate UI
+- surfaced pipeline stage evidence, consistency health, QA/retry readiness,
+  pain-point diagnosis, reference project breakdown, and plan preview
 
 Still required for true industrial deployment:
 
@@ -215,8 +225,6 @@ Still required for true industrial deployment:
 - execute real video renders through production credentials
 - replace demo QA metrics with CV/CLIP/face/outfit/light detectors
 - persist generated media and retry decisions in Jellyfish media/task tables
-- expose LuminAI controls inside Jellyfish frontend, not only the lightweight
-  LuminAI dashboard
 - add auth, project permissions, multi-user review, and queue governance
 
 ## 9. Acceptance Criteria For This Pass
@@ -228,7 +236,13 @@ This pass is acceptable when:
 - `python3 -m src.film_engine.server --host 127.0.0.1 --port 8765` serves a UI.
 - `/api/studio/status` exposes stage completion evidence.
 - `/api/jellyfish/base-status` exposes Jellyfish path, commit, commands, and ports.
+- `/api/v1/film/industrial/projects/{project_id}/overview` exposes the full
+  Novel/Script to Final Editing industrial pipeline state.
+- `/api/v1/film/industrial/projects/{project_id}/plan` returns render queue,
+  QA policy, retry policy, post-production steps, and blockers.
+- Jellyfish Project Workbench includes a `Film Core` tab and the dashboard links
+  into it.
 - tests cover the UI route, status APIs, Jellyfish base inspection, and stage
-  evidence logic.
+  evidence logic, plus Jellyfish-native industrial Film Core contracts.
 - full pytest passes.
 - Docker Compose config for Jellyfish validates.
