@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import gcd
 
 from app.core.contracts.provider import ProviderKey
 from app.core.contracts.video_generation import VideoGenerationInput, VideoRatio
@@ -16,6 +17,27 @@ DEFAULT_RATIO_TO_SIZE_MAPPING: dict[str, str] = {
     "9:16": "720x1280",
     "21:9": "1680x720",
 }
+
+
+def infer_ratio_from_size(value: str | None) -> str | None:
+    """Infer a canonical video ratio from a ratio string or WIDTHxHEIGHT size."""
+    if not value:
+        return None
+    normalized = value.strip().lower()
+    if normalized in ALLOWED_RATIOS:
+        return normalized
+    if "x" not in normalized:
+        return None
+    width_text, height_text = normalized.split("x", 1)
+    if not width_text.isdigit() or not height_text.isdigit():
+        return None
+    width = int(width_text)
+    height = int(height_text)
+    if width <= 0 or height <= 0:
+        return None
+    divisor = gcd(width, height)
+    ratio = f"{width // divisor}:{height // divisor}"
+    return ratio if ratio in ALLOWED_RATIOS else None
 
 
 @dataclass(frozen=True, slots=True)

@@ -37,7 +37,12 @@ class Settings(BaseSettings):
 
     # CORS：环境变量中建议使用逗号分隔（更贴近 docker-compose 用法）
     # 也兼容 JSON 数组：'["http://a","http://b"]'
-    cors_origins: str = "http://localhost:7788,http://127.0.0.1:7788"
+    cors_origins: str = (
+        "http://localhost:7788,http://127.0.0.1:7788,"
+        "http://localhost:7790,http://127.0.0.1:7790"
+    )
+    # 本地前端端口在冲突时会从 7788 漂移到 7790/其他端口；正则只放行本机开发源。
+    cors_origin_regex: str | None = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 
     @property
     def cors_origins_list(self) -> list[str]:
@@ -50,6 +55,11 @@ class Settings(BaseSettings):
                 return [str(x).strip() for x in loaded if str(x).strip()]
             return []
         return [x.strip() for x in s.split(",") if x.strip()]
+
+    @property
+    def cors_origin_regex_value(self) -> str | None:
+        s = (self.cors_origin_regex or "").strip()
+        return s or None
 
     # S3 / 对象存储（用于素材文件）
     s3_endpoint_url: str | None = None

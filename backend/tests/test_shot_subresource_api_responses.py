@@ -93,6 +93,16 @@ class _FakeShotSubresourceDB:
             obj.created_at = now
         obj.updated_at = now
 
+    async def execute(self, *_args, **_kwargs):
+        class _EmptyResult:
+            def scalars(self):
+                return self
+
+            def first(self):
+                return None
+
+        return _EmptyResult()
+
     async def delete(self, obj: object) -> None:
         if isinstance(obj, ShotDetail):
             self.shot_details.pop(obj.id, None)
