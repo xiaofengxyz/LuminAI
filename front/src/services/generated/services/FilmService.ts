@@ -4,6 +4,7 @@
 /* eslint-disable */
 import type { ApiResponse_FilmIndustrialOverviewRead_ } from '../models/ApiResponse_FilmIndustrialOverviewRead_';
 import type { ApiResponse_FilmIndustrialPlanRead_ } from '../models/ApiResponse_FilmIndustrialPlanRead_';
+import type { ApiResponse_FilmIndustrialRunRead_ } from '../models/ApiResponse_FilmIndustrialRunRead_';
 import type { ApiResponse_GenerationTaskLinkRead_ } from '../models/ApiResponse_GenerationTaskLinkRead_';
 import type { ApiResponse_NoneType_ } from '../models/ApiResponse_NoneType_';
 import type { ApiResponse_PaginatedData_GenerationTaskLinkRead__ } from '../models/ApiResponse_PaginatedData_GenerationTaskLinkRead__';
@@ -15,6 +16,7 @@ import type { ApiResponse_TaskResultRead_ } from '../models/ApiResponse_TaskResu
 import type { ApiResponse_TaskStatusRead_ } from '../models/ApiResponse_TaskStatusRead_';
 import type { ApiResponse_VideoPromptPreviewResponse_ } from '../models/ApiResponse_VideoPromptPreviewResponse_';
 import type { FilmIndustrialPlanRequest } from '../models/FilmIndustrialPlanRequest';
+import type { FilmIndustrialRunRequest } from '../models/FilmIndustrialRunRequest';
 import type { GenerationTaskLinkCreate } from '../models/GenerationTaskLinkCreate';
 import type { GenerationTaskLinkUpdate } from '../models/GenerationTaskLinkUpdate';
 import type { ShotFramePromptRequest } from '../models/ShotFramePromptRequest';
@@ -72,6 +74,32 @@ export class FilmService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/film/industrial/projects/{project_id}/plan',
+            path: {
+                'project_id': projectId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * 创建工业闭环生产任务账本
+     * Create Jellyfish task/link records for render, QA, retry, and post-production work.
+     * @returns ApiResponse_FilmIndustrialRunRead_ Successful Response
+     * @throws ApiError
+     */
+    public static createIndustrialRun({
+        projectId,
+        requestBody,
+    }: {
+        projectId: string,
+        requestBody: FilmIndustrialRunRequest,
+    }): CancelablePromise<ApiResponse_FilmIndustrialRunRead_> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/film/industrial/projects/{project_id}/run',
             path: {
                 'project_id': projectId,
             },

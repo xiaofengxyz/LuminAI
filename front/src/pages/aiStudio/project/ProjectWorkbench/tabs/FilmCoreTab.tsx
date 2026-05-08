@@ -25,15 +25,17 @@ import {
 } from '@ant-design/icons'
 import { useParams } from 'react-router-dom'
 import {
+  createIndustrialRun,
   createIndustrialPlan,
   loadIndustrialOverview,
   type FilmIndustrialOverview,
   type FilmIndustrialPlan,
+  type FilmIndustrialRun,
   type FilmImplementationPhase,
   type FilmPipelineStage,
 } from '../../../../../services/industrialFilm'
 
-const { Text } = Typography
+const { Text, Title, Paragraph } = Typography
 
 const statusColor: Record<string, string> = {
   done: 'green',
@@ -84,8 +86,10 @@ export function FilmCoreTab() {
   const { projectId } = useParams<{ projectId: string }>()
   const [overview, setOverview] = useState<FilmIndustrialOverview | null>(null)
   const [plan, setPlan] = useState<FilmIndustrialPlan | null>(null)
+  const [run, setRun] = useState<FilmIndustrialRun | null>(null)
   const [loading, setLoading] = useState(false)
   const [planning, setPlanning] = useState(false)
+  const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const blockingActions = useMemo(
@@ -136,6 +140,26 @@ export function FilmCoreTab() {
     }
   }
 
+  const handleRun = async () => {
+    if (!projectId) return
+    setRunning(true)
+    try {
+      const data = await createIndustrialRun(projectId, {
+        provider: 'runtime_adapter',
+        model: 'project_default_video_model',
+        mode: 'queue_only',
+      })
+      setRun(data)
+      message.success(`已创建 ${data.created_task_count} 个工业闭环任务`)
+      await refresh()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '工业闭环任务创建失败'
+      message.error(msg)
+    } finally {
+      setRunning(false)
+    }
+  }
+
   if (!projectId) {
     return <Empty description="项目不存在" />
   }
@@ -163,6 +187,18 @@ export function FilmCoreTab() {
     <div className="space-y-4 pb-6">
       {error ? <Alert type="warning" showIcon message={error} /> : null}
 
+      <div>
+        <Title level={4} className="!mb-1">
+          Film Core Overview
+        </Title>
+        <Paragraph type="secondary" className="!mb-0">
+          这里是项目级工业电影核心：九阶段落地证据、11 节点生产流水线、一致性健康、痛点诊断、计划预览和任务写回入口。
+        </Paragraph>
+        <Text type="secondary" className="text-xs">
+          入口路径：项目列表 Film Core / 项目速览 Film Core 状态 / 项目工作台顶部 Film Core / `/projects/{projectId}?tab=filmCore`
+        </Text>
+      </div>
+
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Space wrap>
           <Tag color="blue" icon={<ApartmentOutlined />}>
@@ -181,6 +217,9 @@ export function FilmCoreTab() {
           </Button>
           <Button type="primary" icon={<PlayCircleOutlined />} onClick={handlePlan} loading={planning}>
             生成闭环计划
+          </Button>
+          <Button icon={<ControlOutlined />} onClick={handleRun} loading={running}>
+            创建生产任务
           </Button>
         </Space>
       </div>
@@ -378,6 +417,39 @@ export function FilmCoreTab() {
             </Card>
           </Col>
         </Row>
+      ) : null}
+
+      {run ? (
+        <Card
+          title={`任务写回 · ${run.run_id}`}
+          size="small"
+          extra={<Tag color="blue">{run.mode}</Tag>}
+        >
+          <Row gutter={[12, 12]}>
+            <Col xs={12} sm={6}>
+              <Statistic title="总任务" value={run.created_task_count} />
+            </Col>
+            <Col xs={12} sm={6}>
+              <Statistic title="渲染" value={run.render_task_count} />
+            </Col>
+            <Col xs={12} sm={6}>
+              <Statistic title="QA" value={run.qa_task_count} />
+            </Col>
+            <Col xs={12} sm={6}>
+              <Statistic title="重试/后期" value={run.retry_task_count + run.post_task_count} />
+            </Col>
+          </Row>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {run.tasks.slice(0, 8).map((item) => (
+              <Tag key={item.task_id} color={item.status === 'succeeded' ? 'green' : 'processing'}>
+                {item.task_kind} · {item.relation_entity_id}
+              </Tag>
+            ))}
+          </div>
+          <div className="mt-3 text-xs text-gray-500">
+            已写入 Jellyfish generation_tasks 与 generation_task_links；真实供应商 worker 完成后会继续回填文件与镜头视频关系。
+          </div>
+        </Card>
       ) : null}
     </div>
   )

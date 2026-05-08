@@ -229,6 +229,9 @@ class IndustrialProjectSnapshot:
     pending_dialogue_count: int = 0
     task_link_count: int = 0
     accepted_video_task_count: int = 0
+    shot_ids: tuple[str, ...] = ()
+    ready_shot_ids: tuple[str, ...] = ()
+    generated_video_shot_ids: tuple[str, ...] = ()
 
     @property
     def has_script(self) -> bool:
@@ -315,7 +318,7 @@ def build_closed_loop_plan(
     render_queue = [
         {
             "slot": index,
-            "shot_ref": f"{snapshot.chapter_id or snapshot.project_id}-shot-{index:03d}",
+            "shot_ref": _shot_ref(snapshot, index),
             "provider": provider,
             "model": model,
             "output_path": f"{output_dir}/{snapshot.project_id}/{snapshot.chapter_id or 'project'}-{index:03d}.mp4",
@@ -363,6 +366,27 @@ def build_closed_loop_plan(
     }
 
 
+def build_writeback_summary(snapshot: IndustrialProjectSnapshot) -> dict[str, Any]:
+    """Summarize which Jellyfish records an industrial run can write back to."""
+
+    render_targets = len(snapshot.ready_shot_ids) or snapshot.ready_shot_count
+    qa_targets = len(snapshot.generated_video_shot_ids) or snapshot.generated_video_count
+    retry_targets = max(0, snapshot.ready_shot_count - snapshot.generated_video_count)
+    return {
+        "render_targets": render_targets,
+        "qa_targets": qa_targets,
+        "retry_targets": retry_targets,
+        "post_production_targets": 1 if snapshot.generated_video_count > 0 else 0,
+        "writes_generation_tasks": True,
+        "writes_task_links": True,
+        "writes_shot_video_links": False,
+        "note": (
+            "This run creates Jellyfish task/link records for the closed loop. "
+            "Provider workers attach files and update shots after real rendering completes."
+        ),
+    }
+
+
 def _stage(
     key: str,
     *,
@@ -377,6 +401,14 @@ def _stage(
         "evidence": evidence,
         "next_action": next_action,
     }
+
+
+def _shot_ref(snapshot: IndustrialProjectSnapshot, index: int) -> str:
+    if 1 <= index <= len(snapshot.shot_ids):
+        return snapshot.shot_ids[index - 1]
+    if 1 <= index <= len(snapshot.ready_shot_ids):
+        return snapshot.ready_shot_ids[index - 1]
+    return f"{snapshot.chapter_id or snapshot.project_id}-shot-{index:03d}"
 
 
 def _build_stage_index(snapshot: IndustrialProjectSnapshot) -> list[dict[str, str]]:

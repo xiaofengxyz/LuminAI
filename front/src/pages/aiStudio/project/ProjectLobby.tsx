@@ -872,6 +872,15 @@ const ProjectLobby: React.FC = () => {
             <Button type="primary" size="small" className="text-[11px]" icon={<PlusOutlined />} onClick={handleOpenCreate}>
               新建项目
             </Button>
+            <Button
+              size="small"
+              className="text-[11px]"
+              icon={<DeploymentUnitOutlined />}
+              disabled={!selectedProject}
+              onClick={() => selectedProject && navigate(getProjectFilmCorePath(selectedProject.id))}
+            >
+              Film Core
+            </Button>
           </Space>
         </div>
       </div>

@@ -7,11 +7,14 @@ import type {
   FilmIndustrialOverviewRead,
   FilmIndustrialPlanRead,
   FilmIndustrialPlanRequest,
+  FilmIndustrialRunRead,
+  FilmIndustrialRunRequest,
   FilmNextActionRead,
   FilmPainPointRead,
   FilmPipelineStageRead,
   FilmProjectBriefRead,
   FilmQaRetryRead,
+  FilmQueuedTaskRead,
   FilmReferenceProjectRead,
   FilmRenderQueueItemRead,
 } from './generated'
@@ -28,9 +31,11 @@ export type FilmImplementationStatus = FilmImplementationStatusRead
 export type FilmImplementationPhase = FilmImplementationPhaseRead
 export type FilmCompiledPromptContract = FilmCompiledPromptContractRead
 export type FilmRenderQueueItem = FilmRenderQueueItemRead
+export type FilmQueuedTask = FilmQueuedTaskRead
 export type FilmIndustrialOverview = FilmIndustrialOverviewRead
 export type FilmIndustrialPlan = FilmIndustrialPlanRead
-export type { FilmIndustrialPlanRequest }
+export type FilmIndustrialRun = FilmIndustrialRunRead
+export type { FilmIndustrialPlanRequest, FilmIndustrialRunRequest }
 
 type FilmApiResponse<T> =
   {
@@ -53,4 +58,9 @@ export async function loadIndustrialOverview(projectId: string, chapterId?: stri
 export async function createIndustrialPlan(projectId: string, body: FilmIndustrialPlanRequest = {}) {
   const response = await FilmService.createIndustrialPlan({ projectId, requestBody: body })
   return requireData<FilmIndustrialPlan>(response)
+}
+
+export async function createIndustrialRun(projectId: string, body: FilmIndustrialRunRequest = {}) {
+  const response = await FilmService.createIndustrialRun({ projectId, requestBody: body })
+  return requireData<FilmIndustrialRun>(response)
 }

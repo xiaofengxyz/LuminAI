@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.task_manager import DeliveryMode, SqlAlchemyTaskStore
 from app.dependencies import get_db
 from app.models.studio import (
     Chapter,
@@ -26,6 +29,7 @@ from app.models.studio import (
     ShotFrameImage,
     ShotStatus,
 )
+from app.models.task import GenerationTask, GenerationTaskStatus
 from app.models.task_links import GenerationTaskLink, GenerationTaskLinkStatus
 from app.schemas.common import ApiResponse, success_response
 from app.services.common import entity_not_found
@@ -33,6 +37,7 @@ from app.services.industrial_film_core import (
     IndustrialProjectSnapshot,
     build_closed_loop_plan,
     build_industrial_overview,
+    build_writeback_summary,
 )
 
 router = APIRouter(prefix="/industrial")
@@ -187,6 +192,35 @@ class FilmIndustrialPlanRequest(BaseModel):
     output_dir: str = Field("output/jellyfish-industrial", description="计划输出目录")
 
 
+class FilmIndustrialRunRequest(FilmIndustrialPlanRequest):
+    mode: str = Field("queue_only", description="queue_only=只创建任务账本，由现有 worker/人工配置继续执行")
+
+
+class FilmQueuedTaskRead(BaseModel):
+    task_id: str
+    task_kind: str
+    resource_type: str
+    relation_type: str
+    relation_entity_id: str
+    status: str
+    progress: int
+    purpose: str
+
+
+class FilmIndustrialRunRead(BaseModel):
+    run_id: str
+    mode: str
+    plan_id: str
+    created_task_count: int
+    render_task_count: int
+    qa_task_count: int
+    retry_task_count: int
+    post_task_count: int
+    tasks: list[FilmQueuedTaskRead]
+    write_back_summary: dict[str, Any]
+    overview: FilmIndustrialOverviewRead
+
+
 @router.get(
     "/projects/{project_id}/overview",
     response_model=ApiResponse[FilmIndustrialOverviewRead],
@@ -230,6 +264,62 @@ async def create_industrial_plan(
     return success_response(payload)
 
 
+@router.post(
+    "/projects/{project_id}/run",
+    response_model=ApiResponse[FilmIndustrialRunRead],
+    summary="创建工业闭环生产任务账本",
+    operation_id="createIndustrialRun",
+)
+async def create_industrial_run(
+    project_id: str,
+    body: FilmIndustrialRunRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[FilmIndustrialRunRead]:
+    """Create Jellyfish task/link records for render, QA, retry, and post-production work."""
+
+    if body.mode != "queue_only":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only queue_only mode is supported")
+
+    snapshot = await load_industrial_snapshot(db, project_id=project_id, chapter_id=body.chapter_id)
+    plan = build_closed_loop_plan(
+        snapshot,
+        provider=body.provider,
+        model=body.model,
+        output_dir=body.output_dir,
+    )
+    run_id = f"industrial-run-{uuid4().hex[:12]}"
+    created_tasks = await _create_run_tasks(
+        db,
+        run_id=run_id,
+        snapshot=snapshot,
+        plan=plan,
+        mode=body.mode,
+    )
+    await db.commit()
+
+    render_count = sum(1 for item in created_tasks if item["task_kind"] == "industrial_video_render")
+    qa_count = sum(1 for item in created_tasks if item["task_kind"] == "industrial_qa")
+    retry_count = sum(1 for item in created_tasks if item["task_kind"] == "industrial_retry_plan")
+    post_count = sum(1 for item in created_tasks if item["task_kind"] == "industrial_post_production")
+
+    payload = FilmIndustrialRunRead.model_validate(
+        {
+            "run_id": run_id,
+            "mode": body.mode,
+            "plan_id": plan["plan_id"],
+            "created_task_count": len(created_tasks),
+            "render_task_count": render_count,
+            "qa_task_count": qa_count,
+            "retry_task_count": retry_count,
+            "post_task_count": post_count,
+            "tasks": created_tasks,
+            "write_back_summary": build_writeback_summary(snapshot),
+            "overview": plan["overview"],
+        }
+    )
+    return success_response(payload)
+
+
 async def load_industrial_snapshot(
     db: AsyncSession,
     *,
@@ -251,6 +341,8 @@ async def load_industrial_snapshot(
     chapter_ids = [chapter.id for chapter in selected_chapters]
     shots = await _load_shots(db, chapter_ids)
     shot_ids = [shot.id for shot in shots]
+    ready_shot_ids = [shot.id for shot in shots if _value(shot.status) == ShotStatus.ready.value]
+    generated_video_shot_ids = [shot.id for shot in shots if bool(shot.generated_video_file_id)]
 
     return IndustrialProjectSnapshot(
         project_id=project.id,
@@ -266,9 +358,9 @@ async def load_industrial_snapshot(
         condensed_text_length=sum(len(chapter.condensed_text or "") for chapter in selected_chapters),
         chapter_count=len(chapters),
         shot_count=len(shots),
-        ready_shot_count=sum(1 for shot in shots if _value(shot.status) == ShotStatus.ready.value),
+        ready_shot_count=len(ready_shot_ids),
         generating_shot_count=sum(1 for shot in shots if _value(shot.status) == ShotStatus.generating.value),
-        generated_video_count=sum(1 for shot in shots if bool(shot.generated_video_file_id)),
+        generated_video_count=len(generated_video_shot_ids),
         detail_count=await _count_for_shots(db, ShotDetail.id, shot_ids),
         frame_image_count=await _count_for_shots(db, ShotFrameImage.shot_detail_id, shot_ids),
         dialogue_line_count=await _count_for_shots(db, ShotDialogLine.shot_detail_id, shot_ids),
@@ -281,7 +373,236 @@ async def load_industrial_snapshot(
         pending_dialogue_count=await _count_pending_dialogues(db, shot_ids),
         task_link_count=await _count_task_links(db, shot_ids),
         accepted_video_task_count=await _count_accepted_video_task_links(db, shot_ids),
+        shot_ids=tuple(shot_ids),
+        ready_shot_ids=tuple(ready_shot_ids),
+        generated_video_shot_ids=tuple(generated_video_shot_ids),
     )
+
+
+async def _create_run_tasks(
+    db: AsyncSession,
+    *,
+    run_id: str,
+    snapshot: IndustrialProjectSnapshot,
+    plan: dict[str, Any],
+    mode: str,
+) -> list[dict[str, Any]]:
+    store = SqlAlchemyTaskStore(db)
+    created: list[dict[str, Any]] = []
+
+    render_queue = plan.get("render_queue") if isinstance(plan, dict) else []
+    ready_shot_ids = set(snapshot.ready_shot_ids)
+    if isinstance(render_queue, list):
+        for item in render_queue:
+            if not isinstance(item, dict):
+                continue
+            shot_ref = str(item.get("shot_ref") or "")
+            if not shot_ref or shot_ref not in ready_shot_ids:
+                continue
+            task_payload = {
+                "run_id": run_id,
+                "mode": mode,
+                "plan_id": plan.get("plan_id"),
+                "stage": "render_runtime",
+                "shot_id": shot_ref,
+                "provider": item.get("provider"),
+                "model": item.get("model"),
+                "output_path": item.get("output_path"),
+                "references_required": item.get("references_required") or [],
+                "compiled_prompt_contract": item.get("compiled_prompt_contract") or {},
+            }
+            task = await store.create(
+                payload=task_payload,
+                mode=DeliveryMode.async_polling,
+                task_kind="industrial_video_render",
+            )
+            db.add(
+                GenerationTaskLink(
+                    task_id=task.id,
+                    resource_type="video",
+                    relation_type="video",
+                    relation_entity_id=shot_ref,
+                    status=GenerationTaskLinkStatus.todo,
+                )
+            )
+            created.append(
+                _queued_task(
+                    task_id=task.id,
+                    task_kind="industrial_video_render",
+                    resource_type="video",
+                    relation_type="video",
+                    relation_entity_id=shot_ref,
+                    purpose="queue structured video generation through runtime adapter",
+                )
+            )
+
+    for shot_id in snapshot.generated_video_shot_ids:
+        task = await store.create(
+            payload={
+                "run_id": run_id,
+                "mode": mode,
+                "plan_id": plan.get("plan_id"),
+                "stage": "qa_engine",
+                "shot_id": shot_id,
+                "qa_policy": plan.get("qa_policy") or {},
+            },
+            mode=DeliveryMode.async_polling,
+            task_kind="industrial_qa",
+        )
+        db.add(
+            GenerationTaskLink(
+                task_id=task.id,
+                resource_type="qa",
+                relation_type="industrial_qa",
+                relation_entity_id=shot_id,
+                status=GenerationTaskLinkStatus.todo,
+            )
+        )
+        created.append(
+            _queued_task(
+                task_id=task.id,
+                task_kind="industrial_qa",
+                resource_type="qa",
+                relation_type="industrial_qa",
+                relation_entity_id=shot_id,
+                purpose="score identity, costume, prompt, motion, and continuity",
+            )
+        )
+
+    retry_targets = [shot_id for shot_id in snapshot.ready_shot_ids if shot_id not in snapshot.generated_video_shot_ids]
+    for shot_id in retry_targets:
+        task = await store.create(
+            payload={
+                "run_id": run_id,
+                "mode": mode,
+                "plan_id": plan.get("plan_id"),
+                "stage": "retry_engine",
+                "shot_id": shot_id,
+                "retry_policy": plan.get("retry_policy") or {},
+            },
+            mode=DeliveryMode.async_polling,
+            task_kind="industrial_retry_plan",
+        )
+        db.add(
+            GenerationTaskLink(
+                task_id=task.id,
+                resource_type="retry",
+                relation_type="industrial_retry",
+                relation_entity_id=shot_id,
+                status=GenerationTaskLinkStatus.todo,
+            )
+        )
+        created.append(
+            _queued_task(
+                task_id=task.id,
+                task_kind="industrial_retry_plan",
+                resource_type="retry",
+                relation_type="industrial_retry",
+                relation_entity_id=shot_id,
+                purpose="prepare repair patches for shots missing accepted video",
+            )
+        )
+
+    post_production = plan.get("post_production") if isinstance(plan, dict) else {}
+    if isinstance(post_production, dict) and post_production.get("enabled"):
+        task = await store.create(
+            payload={
+                "run_id": run_id,
+                "mode": mode,
+                "plan_id": plan.get("plan_id"),
+                "stage": "final_editing",
+                "project_id": snapshot.project_id,
+                "chapter_id": snapshot.chapter_id,
+                "post_production": post_production,
+            },
+            mode=DeliveryMode.async_polling,
+            task_kind="industrial_post_production",
+        )
+        db.add(
+            GenerationTaskLink(
+                task_id=task.id,
+                resource_type="video",
+                relation_type="industrial_post_production",
+                relation_entity_id=snapshot.chapter_id or snapshot.project_id,
+                status=GenerationTaskLinkStatus.todo,
+            )
+        )
+        created.append(
+            _queued_task(
+                task_id=task.id,
+                task_kind="industrial_post_production",
+                resource_type="video",
+                relation_type="industrial_post_production",
+                relation_entity_id=snapshot.chapter_id or snapshot.project_id,
+                purpose="assemble accepted clips, subtitles, audio, transitions, and export",
+            )
+        )
+
+    if not created:
+        task = await store.create(
+            payload={
+                "run_id": run_id,
+                "mode": mode,
+                "plan_id": plan.get("plan_id"),
+                "stage": "industrial_gate",
+                "project_id": snapshot.project_id,
+                "blockers": plan.get("blockers") or [],
+            },
+            mode=DeliveryMode.async_polling,
+            task_kind="industrial_gate",
+        )
+        row = await db.get(GenerationTask, task.id)
+        if row is not None:
+            row.status = GenerationTaskStatus.succeeded
+            row.progress = 100
+            row.finished_at = datetime.now(UTC).replace(tzinfo=None)
+            row.result = {"message": "No renderable shots yet; resolve Film Core blockers first."}
+        db.add(
+            GenerationTaskLink(
+                task_id=task.id,
+                resource_type="plan",
+                relation_type="industrial_project",
+                relation_entity_id=snapshot.project_id,
+                status=GenerationTaskLinkStatus.accepted,
+            )
+        )
+        created.append(
+            _queued_task(
+                task_id=task.id,
+                task_kind="industrial_gate",
+                resource_type="plan",
+                relation_type="industrial_project",
+                relation_entity_id=snapshot.project_id,
+                status_value=GenerationTaskStatus.succeeded.value,
+                progress=100,
+                purpose="record blockers because no shots are ready for production",
+            )
+        )
+
+    return created
+
+
+def _queued_task(
+    *,
+    task_id: str,
+    task_kind: str,
+    resource_type: str,
+    relation_type: str,
+    relation_entity_id: str,
+    purpose: str,
+    status_value: str = GenerationTaskStatus.pending.value,
+    progress: int = 0,
+) -> dict[str, Any]:
+    return {
+        "task_id": task_id,
+        "task_kind": task_kind,
+        "resource_type": resource_type,
+        "relation_type": relation_type,
+        "relation_entity_id": relation_entity_id,
+        "status": status_value,
+        "progress": progress,
+        "purpose": purpose,
+    }
 
 
 async def _load_chapters(db: AsyncSession, project_id: str) -> list[Chapter]:

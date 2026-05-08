@@ -20,6 +20,7 @@ export type { ApiResponse_FileDetailRead_ } from './models/ApiResponse_FileDetai
 export type { ApiResponse_FileRead_ } from './models/ApiResponse_FileRead_';
 export type { ApiResponse_FilmIndustrialOverviewRead_ } from './models/ApiResponse_FilmIndustrialOverviewRead_';
 export type { ApiResponse_FilmIndustrialPlanRead_ } from './models/ApiResponse_FilmIndustrialPlanRead_';
+export type { ApiResponse_FilmIndustrialRunRead_ } from './models/ApiResponse_FilmIndustrialRunRead_';
 export type { ApiResponse_GenerationTaskLinkRead_ } from './models/ApiResponse_GenerationTaskLinkRead_';
 export type { ApiResponse_ImageGenerationOptionsRead_ } from './models/ApiResponse_ImageGenerationOptionsRead_';
 export type { ApiResponse_list_PromptCategoryOptionRead__ } from './models/ApiResponse_list_PromptCategoryOptionRead__';
@@ -120,6 +121,8 @@ export type { FilmImplementationStatusRead } from './models/FilmImplementationSt
 export type { FilmIndustrialOverviewRead } from './models/FilmIndustrialOverviewRead';
 export type { FilmIndustrialPlanRead } from './models/FilmIndustrialPlanRead';
 export type { FilmIndustrialPlanRequest } from './models/FilmIndustrialPlanRequest';
+export type { FilmIndustrialRunRead } from './models/FilmIndustrialRunRead';
+export type { FilmIndustrialRunRequest } from './models/FilmIndustrialRunRequest';
 export type { FilmNextActionRead } from './models/FilmNextActionRead';
 export type { FilmPainPointRead } from './models/FilmPainPointRead';
 export type { FilmPipelineStageRead } from './models/FilmPipelineStageRead';
@@ -127,6 +130,7 @@ export type { FilmPostProductionRead } from './models/FilmPostProductionRead';
 export type { FilmProjectBriefRead } from './models/FilmProjectBriefRead';
 export type { FilmQaPolicyRead } from './models/FilmQaPolicyRead';
 export type { FilmQaRetryRead } from './models/FilmQaRetryRead';
+export type { FilmQueuedTaskRead } from './models/FilmQueuedTaskRead';
 export type { FilmReferenceProjectRead } from './models/FilmReferenceProjectRead';
 export type { FilmRenderQueueItemRead } from './models/FilmRenderQueueItemRead';
 export type { FilmRetryPolicyRead } from './models/FilmRetryPolicyRead';
