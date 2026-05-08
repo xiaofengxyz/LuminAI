@@ -12,6 +12,7 @@ from app.services.industrial_film_core import (  # noqa: E402
     IndustrialProjectSnapshot,
     build_closed_loop_plan,
     build_industrial_overview,
+    build_writeback_summary,
 )
 
 
@@ -82,17 +83,54 @@ def test_closed_loop_plan_exposes_render_qa_retry_and_post_contracts():
         detail_count=1,
         character_count=1,
         actor_link_count=0,
+        shot_ids=("shot-a", "shot-b"),
+        ready_shot_ids=("shot-a", "shot-b"),
     )
 
     plan = build_closed_loop_plan(snapshot, provider="kling", model="kling-v1", output_dir="output/test")
 
     assert plan["plan_id"] == "industrial-proj-2-project"
     assert len(plan["render_queue"]) == 2
+    assert plan["render_queue"][0]["shot_ref"] == "shot-a"
     assert plan["render_queue"][0]["provider"] == "kling"
     assert plan["qa_policy"]["face_similarity_min"] > 0.8
     assert plan["retry_policy"]["planned_retry_candidates"] == 2
     assert plan["post_production"]["enabled"] is False
     assert any(blocker["severity"] == "high" for blocker in plan["blockers"])
+
+
+def test_writeback_summary_counts_render_qa_retry_and_post_targets():
+    snapshot = IndustrialProjectSnapshot(
+        project_id="proj-writeback",
+        project_name="Writeback",
+        project_style="真人都市",
+        visual_style="现实",
+        seed=11,
+        unify_style=True,
+        script_text_length=900,
+        chapter_count=1,
+        shot_count=3,
+        ready_shot_count=3,
+        generated_video_count=1,
+        detail_count=3,
+        character_count=2,
+        actor_link_count=2,
+        scene_link_count=3,
+        prop_link_count=1,
+        costume_link_count=2,
+        shot_ids=("shot-1", "shot-2", "shot-3"),
+        ready_shot_ids=("shot-1", "shot-2", "shot-3"),
+        generated_video_shot_ids=("shot-1",),
+    )
+
+    summary = build_writeback_summary(snapshot)
+
+    assert summary["render_targets"] == 3
+    assert summary["qa_targets"] == 1
+    assert summary["retry_targets"] == 2
+    assert summary["post_production_targets"] == 1
+    assert summary["writes_generation_tasks"] is True
+    assert summary["writes_task_links"] is True
 
 
 def test_industrial_overview_exposes_nine_implementation_phases():
@@ -129,8 +167,13 @@ def test_industrial_overview_exposes_nine_implementation_phases():
 def test_jellyfish_industrial_routes_are_registered():
     route_file = BACKEND_DIR / "app" / "api" / "v1" / "routes" / "film" / "__init__.py"
     route_source = route_file.read_text(encoding="utf-8")
+    industrial_source = (BACKEND_DIR / "app" / "api" / "v1" / "routes" / "film" / "industrial.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "industrial.router" in route_source
+    assert "createIndustrialRun" in industrial_source
+    assert "GenerationTaskLink" in industrial_source
 
 
 def test_project_workbench_surfaces_film_core_from_lobby_and_generated_client():
@@ -140,8 +183,14 @@ def test_project_workbench_surfaces_film_core_from_lobby_and_generated_client():
         front_dir / "pages" / "aiStudio" / "project" / "ProjectWorkbench" / "routes.ts"
     ).read_text(encoding="utf-8")
     film_service_source = (front_dir / "services" / "industrialFilm.ts").read_text(encoding="utf-8")
+    film_core_source = (
+        front_dir / "pages" / "aiStudio" / "project" / "ProjectWorkbench" / "tabs" / "FilmCoreTab.tsx"
+    ).read_text(encoding="utf-8")
 
     assert "getProjectFilmCorePath" in routes_source
     assert "Film Core 状态" in lobby_source
+    assert "创建生产任务" in film_core_source
+    assert "Film Core Overview" in film_core_source
+    assert "createIndustrialRun" in film_service_source
     assert "FilmService" in film_service_source
     assert "services/http" not in film_service_source

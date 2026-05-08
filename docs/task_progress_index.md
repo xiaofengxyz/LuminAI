@@ -2,6 +2,17 @@
 
 Current task: Implement the industrial AI film engine requirements inside the existing Jellyfish UI/backend, keep a single-agent execution path, update progress continuously, test, run, clean, resolve conflicts, and push necessary changes.
 
+## Session 2026-05-09 - 8011 Film Core Run And Manual Closure
+
+| Node | Status | Evidence |
+| --- | --- | --- |
+| 1. Plan and baseline review | Done | Planned single-agent execution with no sub-agents; confirmed root `main...origin/main`, Jellyfish submodule branch `main...origin/vendor-jellyfish-industrial-film-core`, frontend port `7790` running, and no listener on backend port `8011` before recovery. |
+| 2. 8011 recovery and Film Core visibility | Done | Started Jellyfish backend on `http://127.0.0.1:8011`; `/health` returned 200. Film Core overview is visible at `/projects/{projectId}?tab=filmCore`, project cards, project preview, project workbench header, and the new selected-project toolbar button. |
+| 3. Industrial run implementation | Done | Added `POST /api/v1/film/industrial/projects/{project_id}/run`, `FilmIndustrialRun*` contracts, generated frontend client support, and UI `创建生产任务`; run writes `industrial_video_render`, `industrial_qa`, `industrial_retry_plan`, `industrial_post_production`, or `industrial_gate` records into Jellyfish `generation_tasks` and `generation_task_links`. |
+| 4. Testing and live smoke | Done | `python3 -m pytest -q -s tests/test_jellyfish_industrial_film_core.py` passed 6; root `python3 -m pytest -q -s` passed 147; frontend `npx pnpm@9.15.9 run typecheck` passed; frontend `run build` passed; backend `.venv/bin/python -m pytest -q -s` passed 284; live smoke created a temporary project/chapter/ready shot, `/overview` returned `jellyfish_native_industrial_closed_loop`, `/run` created 2 industrial tasks, and cleanup removed the smoke data. |
+| 5. Documentation and manual | Done | Updated README, system architecture, Jellyfish blueprint, execution plan, test cases, and project function manual with explicit answers on implemented functions, UI operation, industry pain points, and a zero-to-multi-episode AI manju workflow. |
+| 6. Cleanup, conflict scan, commit, push | Done | Removed generated caches/build output while preserving tracked files; conflict marker scan found none; `git diff --check` passed in root and Jellyfish submodule; Jellyfish commit `11983c4` was pushed to `origin/vendor-jellyfish-industrial-film-core`; root commit/push completed for docs, tests, and submodule pointer. |
+
 ## Session 2026-05-08 - CORS And 8011 Film Core Recovery
 
 | Node | Status | Evidence |

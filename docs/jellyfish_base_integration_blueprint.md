@@ -199,7 +199,8 @@ generation, QA, and retry.
 | Phase 6 | Done | Added backend director rules, character/scene bible consistency contracts, QA/retry/batch closure, and dependency-light run-readiness endpoints before UI binding. |
 | Phase 7 | Done | Added a real upstream Jellyfish submodule, Jellyfish base inspector, local Studio Dashboard UI, and status APIs. |
 | Phase 8 | Done | Added Jellyfish-native industrial Film Core overview and plan-preview APIs plus a Project Workbench `Film Core` tab. The tab now surfaces the starter-kit `9/9` implementation evidence and the 11-node production pipeline. |
-| Product Follow-up | Next | Persist generated media, QA reports, retry decisions, and post-production outcomes back to live Jellyfish records and task links. |
+| Phase 9 | Done | Added Film Core `run` API and UI action that writes render, QA, retry, post-production, or blocker-gate records into live Jellyfish `generation_tasks` and `generation_task_links`. |
+| Product Follow-up | Next | Bind provider/runtime workers to execute those task records and attach real generated media, QA reports, retry outcomes, and exports. |
 
 The starter-kit nine implementation phases are complete. Their evidence is
 available in the Jellyfish `Film Core` tab through the

@@ -61,6 +61,7 @@ The report identifies the real moat for a 2-3 person AI manju team as a reusable
 | Phase 9 | Done | `src/film_engine/production.py` builds closed-loop chapter plans with render requests, QA reports, retry requests, and optional post-production planning. |
 | Phase 10 | Done | `vendor/jellyfish` tracks the real upstream Jellyfish base; `src/film_engine/studio.py` and `src/film_engine/server.py` expose the Studio Dashboard plus status APIs. |
 | Phase 11 | Done | Jellyfish backend exposes `/api/v1/film/industrial/...`; Jellyfish Project Workbench has a native `Film Core` tab for 9/9 implementation evidence, pipeline status, consistency health, QA/retry readiness, and plan preview. |
+| Phase 12 | Done | Jellyfish Film Core now exposes `POST /api/v1/film/industrial/projects/{project_id}/run`; the UI `创建生产任务` action writes render, QA, retry, post-production, or blocker-gate tasks into `generation_tasks` and `generation_task_links`. |
 
 ## Where The Nine Phases Are Visible
 
@@ -79,6 +80,13 @@ The `Film Core` tab renders a `九阶段交付状态` panel from
 API. The same tab separately renders the 11-node production pipeline from
 Novel / Script through Final Editing.
 
+The same tab now has two operational actions:
+
+```text
+生成闭环计划     preview render / QA / retry / post-production contracts
+创建生产任务     write industrial task records into Jellyfish task center
+```
+
 ## 2026-05-08 Run Readiness Review Plan
 
 | Finding | Action | Status |
@@ -93,8 +101,8 @@ Novel / Script through Final Editing.
 
 | Priority | Delivery |
 | --- | --- |
-| 1 | Persist generated media, QA reports, retry decisions, and post-production results back into Jellyfish records. |
-| 2 | Add provider workers for `RenderRequest` and `PostProductionStep` execution. |
+| 1 | Bind provider workers to execute `industrial_video_render`, `industrial_qa`, `industrial_retry_plan`, and `industrial_post_production` records. |
+| 2 | Persist real provider media files, QA reports, retry decisions, and final exports back to Jellyfish file/shot/editor records after worker completion. |
 | 3 | Replace deterministic QA planning metrics with production CV/CLIP/face/outfit/light detectors. |
 
 ## Non-Goals For This Pass

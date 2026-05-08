@@ -49,7 +49,8 @@ small local dashboard for run-readiness, and the production-facing Film Core
 overview now lives inside Jellyfish through `/api/v1/film/industrial/...` and
 the Project Workbench `Film Core` tab. The same tab surfaces both the starter-kit
 `9/9` implementation completion evidence and the 11-node industrial production
-pipeline.
+pipeline, and it can write queueable render/QA/retry/post-production task
+records into Jellyfish `generation_tasks` and `generation_task_links`.
 
 ## Key Principles
 

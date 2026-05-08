@@ -129,7 +129,33 @@ Project Workbench -> Film Core
 ```
 
 The tab shows both starter-kit `9/9` implementation completion evidence and the
-11-node production pipeline from script through final editing.
+11-node production pipeline from script through final editing. It also includes
+the operational `创建生产任务` action, which writes render, QA, retry, and
+post-production task records into Jellyfish `generation_tasks` and
+`generation_task_links` so the existing task center can track the industrial
+closed loop.
+
+Industrial Film Core endpoints:
+
+```text
+GET  http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/overview
+POST http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/plan
+POST http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/run
+```
+
+For local development, start the Jellyfish backend on `8011`:
+
+```bash
+cd vendor/jellyfish/backend
+NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 \
+.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8011
+```
+
+Open the frontend on the running Vite port, usually:
+
+```text
+http://localhost:7790/projects
+```
 
 Reference docs:
 
