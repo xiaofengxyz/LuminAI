@@ -2,6 +2,17 @@
 
 Current task: Implement the industrial AI film engine requirements inside the existing Jellyfish UI/backend, keep a single-agent execution path, update progress continuously, test, run, clean, resolve conflicts, and push necessary changes.
 
+## Session 2026-05-12 - CineForge Workflow State Closure
+
+| Node | Status | Evidence |
+| --- | --- | --- |
+| 1. Plan and baseline review | In Progress | Single-agent execution confirmed; root branch `main...origin/main`, Jellyfish submodule branch `main...origin/vendor-jellyfish-industrial-film-core`; `docs/Codex_Workflow_Prompts/` is currently untracked and treated as the user-provided implementation spec. Plan: persist CineForge workflow state, add edit/regenerate contracts, wire Film Core UI, test, document, clean, commit, and push. |
+| 2. Workflow state implementation | Pending | Planned backend Jellyfish model/service/API work for persisted workflow snapshots, editable stage patches, and regenerate task records while reusing generation task ledger. |
+| 3. Studio UI integration | Pending | Planned Film Core tab and generated service updates for load/edit/regenerate workflow state actions inside the existing Jellyfish Project Workbench. |
+| 4. Test-engineer pass | Pending | Planned root/Jellyfish service tests plus UI source contract checks and updated test-case documentation. |
+| 5. User manual and completion review | Pending | Planned README, architecture, project function manual, industrial review, and zero-to-multi-episode operator guide updates. |
+| 6. Cleanup, conflict scan, commit, push | Pending | Pending after implementation and verification. |
+
 ## Session 2026-05-11 - Reboot Recovery And Film Core Operator Closure
 
 | Node | Status | Evidence |
