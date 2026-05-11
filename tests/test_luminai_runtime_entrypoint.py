@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import json
 import threading
-from urllib.request import urlopen
+from urllib.request import ProxyHandler, build_opener
 
 from src.film_engine.demo import build_demo_plan_summary
 from src.film_engine.server import create_server
 
 
+_LOCAL_OPENER = build_opener(ProxyHandler({}))
+
+
 def _get_json(url: str) -> dict[str, object]:
-    with urlopen(url, timeout=5) as response:
+    with _LOCAL_OPENER.open(url, timeout=5) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
 def _get_text(url: str) -> str:
-    with urlopen(url, timeout=5) as response:
+    with _LOCAL_OPENER.open(url, timeout=5) as response:
         return response.read().decode("utf-8")
 
 
