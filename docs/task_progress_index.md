@@ -2,6 +2,17 @@
 
 Current task: Implement the industrial AI film engine requirements inside the existing Jellyfish UI/backend, keep a single-agent execution path, update progress continuously, test, run, clean, resolve conflicts, and push necessary changes.
 
+## Session 2026-05-11 - Reboot Recovery And Film Core Operator Closure
+
+| Node | Status | Evidence |
+| --- | --- | --- |
+| 1. Plan and reboot baseline | Done | Planned single-agent execution with no sub-agents; confirmed root branch `main...origin/main` is clean, Jellyfish submodule points at `11983c4` on `main...origin/vendor-jellyfish-industrial-film-core`, and reboot left no listener on backend port `8011` or frontend port `7790`. |
+| 2. Service recovery and Film Core visibility | Done | Restarted backend with `.venv/bin/python -m uvicorn`; `/health` returned 200 on `127.0.0.1:8011`. Found the previous frontend command could fall back to Vite `7788`; added `dev:film-core`, started `7790`, and confirmed `/projects` returns 200 HTML. Live project list is currently empty, so Film Core overview is project-scoped and needs a project id. |
+| 3. Architect implementation pass | Done | Added a stable frontend `dev:film-core` script and made the project-list Film Core entry actionable even without projects by opening project creation first; selected projects still route to `/projects/{projectId}?tab=filmCore`. |
+| 4. Test-engineer pass | Done | Added regression coverage for `dev:film-core` and empty-project Film Core discoverability. Targeted root tests passed 9; root full `python3 -m pytest -q -s` passed 148; Jellyfish backend `.venv/bin/python -m pytest -q -s` passed 284; frontend `npx pnpm@9.15.9 run typecheck` passed; frontend `run build` passed with only the existing large-chunk warning. Live smoke created and deleted a temporary project; overview returned `jellyfish_native_industrial_closed_loop`, 11 pipeline nodes, and `9/9 starter-kit phases complete`; direct Film Core URL returned HTTP 200. |
+| 5. User manual and completion review | Done | Updated README/manual/review/test-case docs with corrected backend/frontend commands, explicit `dev:film-core` startup, empty-project Film Core behavior, completion status, UI operation surface, pain-point coverage, and zero-to-multi-episode workflow. |
+| 6. Cleanup, conflict scan, commit, push | Done | Removed frontend build output and test caches while preserving tracked files; restored tracked `.cursor` cache files that predated this task; conflict marker scan found none; `git diff --check` passed in root and Jellyfish submodule; Jellyfish commit `3f06a9a` was pushed to `origin/vendor-jellyfish-industrial-film-core`; root docs/tests/submodule pointer changes are committed and pushed in this closeout. |
+
 ## Session 2026-05-09 - 8011 Film Core Run And Manual Closure
 
 | Node | Status | Evidence |

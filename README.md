@@ -148,10 +148,17 @@ For local development, start the Jellyfish backend on `8011`:
 ```bash
 cd vendor/jellyfish/backend
 NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 \
-.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8011
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8011
 ```
 
-Open the frontend on the running Vite port, usually:
+Start the Jellyfish frontend on the Film Core operator port:
+
+```bash
+cd vendor/jellyfish/front
+VITE_BACKEND_URL=http://127.0.0.1:8011 npx pnpm@9.15.9 run dev:film-core
+```
+
+Open:
 
 ```text
 http://localhost:7790/projects

@@ -38,6 +38,7 @@
 | Backend route import | `PYTHONPATH=. .venv/bin/python -c "from app.api.v1.routes.film.industrial import router; print(len(router.routes))"` from `vendor/jellyfish/backend` | Prints `3`, covering overview, plan, and run endpoints. |
 | Frontend type safety | `npx pnpm@9.15.9 run typecheck` from `vendor/jellyfish/front` | Project Workbench `Film Core` tab, OpenAPI generated client wrapper, and mock handlers typecheck. |
 | Manual UI smoke | Open `/projects/{projectId}?tab=filmCore` in Jellyfish frontend | Film Core tab shows `九阶段交付状态`, 11-node production pipeline, consistency health, pain-point diagnosis, plan button, and reference project breakdown inside the existing Jellyfish workbench. |
+| Reboot service recovery | Start backend with `.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8011`, then start frontend with `VITE_BACKEND_URL=http://127.0.0.1:8011 npx pnpm@9.15.9 run dev:film-core` | `/health` returns 200, `http://localhost:7790/projects` returns the Vite HTML shell, and the Film Core toolbar button remains discoverable even when the project list is empty. |
 | CORS and runtime backend | `python3 -m pytest -q -s tests/test_jellyfish_cors_runtime_config.py` | Frontend runtime defaults to Jellyfish backend `8011`; `/api/v1/studio/projects` and `/api/v1/film/tasks?recent_seconds=15&page=1&page_size=50` return CORS headers for local frontend port `7790`. |
 | Industrial run writeback | `POST /api/v1/film/industrial/projects/{projectId}/run` | Creates Jellyfish `generation_tasks` and `generation_task_links` for render, QA, retry, post-production, or a blocker gate task. |
 | Jellyfish backend regression | `.venv/bin/python -m pytest -q -s` from `vendor/jellyfish/backend` | Full backend suite passes, including CORS middleware, Studio APIs, task center, response envelopes, and video capability mapping. |
@@ -85,8 +86,12 @@ Check:
 - shot workbench renders two demo render requests
 - one retry request is visible through the failed shot
 - Jellyfish base panel shows path, commit, ports, and Docker command
+- `npx pnpm@9.15.9 run dev:film-core` serves the Jellyfish UI at
+  `http://localhost:7790/projects`
 - Jellyfish project cards, preview side panel, and workbench header expose direct
   Film Core entry points
+- Empty project lists still expose a Film Core button that opens project
+  creation first, because Film Core overview needs a project id
 - Jellyfish Project Workbench `Film Core` tab renders 9/9 implementation
   phases plus the industrial production pipeline inside the existing Jellyfish UI
 - Clicking `创建生产任务` writes industrial task records into the Jellyfish task
@@ -101,5 +106,5 @@ Check:
   detectors still require provider/runtime worker integration.
 - In an earlier session, Jellyfish Docker Compose full-stack startup was blocked by a
   Debian apt mirror `502/404` during backend image build. The verified fallback
-  local run path is `uv` SQLite backend on port 8011 plus the Jellyfish frontend
-  on port 7788 or the next free Vite port such as 7790.
+  local run path is SQLite backend on port 8011 plus `dev:film-core` frontend on
+  port 7790.

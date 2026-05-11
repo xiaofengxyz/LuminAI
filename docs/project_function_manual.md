@@ -331,9 +331,9 @@ POST /api/v1/film/industrial/projects/{project_id}/run
 ```
 
 Local frontend runtime defaults to Jellyfish backend `http://localhost:8011`.
-If Vite moves from `7788` to `7790` because the first port is occupied, backend
-CORS still allows the studio requests, including `/api/v1/studio/projects` and
-`/api/v1/film/tasks`.
+Use the `dev:film-core` script when you want the operator UI to be predictably
+available at `http://localhost:7790/projects`; backend CORS also allows other
+local Vite ports when the port is intentionally changed.
 
 The overview endpoint maps live Jellyfish project/chapter/shot/asset/task state
 into:
@@ -442,7 +442,7 @@ git submodule update --init --recursive
 ```bash
 cd vendor/jellyfish/backend
 NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 \
-.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8011
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8011
 ```
 
 3. Confirm backend health.
@@ -469,8 +469,12 @@ If you start it manually:
 
 ```bash
 cd vendor/jellyfish/front
-VITE_BACKEND_URL=http://127.0.0.1:8011 npx pnpm@9.15.9 run dev -- --host 0.0.0.0 --port 7790
+VITE_BACKEND_URL=http://127.0.0.1:8011 npx pnpm@9.15.9 run dev:film-core
 ```
+
+If there are no projects yet, the project list still shows a Film Core button.
+Clicking it opens project creation first because Film Core overview is scoped to
+a concrete project.
 
 5. Configure model providers in Jellyfish:
 
