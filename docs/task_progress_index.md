@@ -6,10 +6,10 @@ Current task: Implement the industrial AI film engine requirements inside the ex
 
 | Node | Status | Evidence |
 | --- | --- | --- |
-| 1. Plan and baseline review | In Progress | Single-agent execution confirmed; root branch `main...origin/main`, Jellyfish submodule branch `main...origin/vendor-jellyfish-industrial-film-core`; `docs/Codex_Workflow_Prompts/` is currently untracked and treated as the user-provided implementation spec. Plan: persist CineForge workflow state, add edit/regenerate contracts, wire Film Core UI, test, document, clean, commit, and push. |
-| 2. Workflow state implementation | Pending | Planned backend Jellyfish model/service/API work for persisted workflow snapshots, editable stage patches, and regenerate task records while reusing generation task ledger. |
-| 3. Studio UI integration | Pending | Planned Film Core tab and generated service updates for load/edit/regenerate workflow state actions inside the existing Jellyfish Project Workbench. |
-| 4. Test-engineer pass | Pending | Planned root/Jellyfish service tests plus UI source contract checks and updated test-case documentation. |
+| 1. Plan and baseline review | Done | Single-agent execution confirmed; root branch `main...origin/main`, Jellyfish submodule branch `main...origin/vendor-jellyfish-industrial-film-core`; `docs/Codex_Workflow_Prompts/` was added as the user-provided implementation spec in checkpoint commit `04b5a00`. |
+| 2. Workflow state implementation | Done | Added Jellyfish `CineForgeWorkflowState` persistence, `GET/PATCH/POST /workflow-state` API contracts, default nine-stage CineForge state builder, structured edit patches, and targeted regenerate task ledger records using `generation_tasks` and `generation_task_links`. |
+| 3. Studio UI integration | Done | Added generated Film service types/methods plus Film Core tab controls for loading workflow state, choosing a stage, saving a stage edit, and queueing stage regeneration inside the existing Jellyfish Project Workbench. |
+| 4. Test-engineer pass | In Progress | Targeted root `python3 -m pytest -q -s tests/test_jellyfish_industrial_film_core.py` passed 7; Jellyfish backend `.venv/bin/python -m pytest -q -s tests/test_industrial_workflow_state.py` passed 2; frontend `npx pnpm@9.15.9 run typecheck` passed. |
 | 5. User manual and completion review | Pending | Planned README, architecture, project function manual, industrial review, and zero-to-multi-episode operator guide updates. |
 | 6. Cleanup, conflict scan, commit, push | Pending | Pending after implementation and verification. |
 

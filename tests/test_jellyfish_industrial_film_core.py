@@ -9,7 +9,9 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from app.services.industrial_film_core import (  # noqa: E402
+    CINEFORGE_WORKFLOW_STAGES,
     IndustrialProjectSnapshot,
+    build_cineforge_workflow_state,
     build_closed_loop_plan,
     build_industrial_overview,
     build_writeback_summary,
@@ -133,6 +135,40 @@ def test_writeback_summary_counts_render_qa_retry_and_post_targets():
     assert summary["writes_task_links"] is True
 
 
+def test_cineforge_workflow_state_exposes_persisted_editable_stage_contracts():
+    snapshot = IndustrialProjectSnapshot(
+        project_id="proj-cineforge",
+        project_name="Editable Workflow",
+        project_style="真人都市",
+        visual_style="现实",
+        seed=99,
+        unify_style=True,
+        script_text_length=1000,
+        chapter_count=2,
+        shot_count=6,
+        ready_shot_count=4,
+        generated_video_count=1,
+        detail_count=6,
+        character_count=3,
+        actor_link_count=3,
+        scene_link_count=4,
+        prop_link_count=2,
+        costume_link_count=3,
+        shot_ids=("shot-1", "shot-2"),
+    )
+
+    state = build_cineforge_workflow_state(snapshot, workflow_id="workflow-1")
+
+    assert state["workflow_key"] == "cineforge_ai_drama_os"
+    assert state["stage_count"] == 9
+    assert [stage["key"] for stage in state["stages"]] == [stage["key"] for stage in CINEFORGE_WORKFLOW_STAGES]
+    assert state["stage_data"]["novel_engine"]["world_bible"]["title"] == "Editable Workflow"
+    assert state["stage_data"]["image_runtime"]["adapters"] == ["flux", "sdxl", "storydiffusion", "comfyui"]
+    assert state["stage_data"]["video_runtime"]["adapters"] == ["seedance", "kling", "veo", "wan2.1", "sora"]
+    assert state["edit_contract"]["method"] == "PATCH"
+    assert state["regenerate_contract"]["method"] == "POST"
+
+
 def test_industrial_overview_exposes_nine_implementation_phases():
     snapshot = IndustrialProjectSnapshot(
         project_id="proj-3",
@@ -173,6 +209,10 @@ def test_jellyfish_industrial_routes_are_registered():
 
     assert "industrial.router" in route_source
     assert "createIndustrialRun" in industrial_source
+    assert "loadWorkflowState" in industrial_source
+    assert "editWorkflowState" in industrial_source
+    assert "regenerateWorkflowStage" in industrial_source
+    assert "CineForgeWorkflowState" in industrial_source
     assert "GenerationTaskLink" in industrial_source
 
 
@@ -186,11 +226,21 @@ def test_project_workbench_surfaces_film_core_from_lobby_and_generated_client():
     film_core_source = (
         front_dir / "pages" / "aiStudio" / "project" / "ProjectWorkbench" / "tabs" / "FilmCoreTab.tsx"
     ).read_text(encoding="utf-8")
+    generated_film_service_source = (front_dir / "services" / "generated" / "services" / "FilmService.ts").read_text(
+        encoding="utf-8"
+    )
 
     assert "getProjectFilmCorePath" in routes_source
     assert "Film Core 状态" in lobby_source
     assert "创建生产任务" in film_core_source
+    assert "CineForge 可编辑工作流状态" in film_core_source
+    assert "保存阶段编辑" in film_core_source
+    assert "重生成阶段" in film_core_source
     assert "Film Core Overview" in film_core_source
+    assert "loadWorkflowState" in film_service_source
+    assert "editWorkflowState" in film_service_source
+    assert "regenerateWorkflowStage" in film_service_source
+    assert "loadWorkflowState" in generated_film_service_source
     assert "createIndustrialRun" in film_service_source
     assert "FilmService" in film_service_source
     assert "services/http" not in film_service_source
