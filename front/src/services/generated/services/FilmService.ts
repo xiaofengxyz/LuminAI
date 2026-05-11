@@ -5,6 +5,8 @@
 import type { ApiResponse_FilmIndustrialOverviewRead_ } from '../models/ApiResponse_FilmIndustrialOverviewRead_';
 import type { ApiResponse_FilmIndustrialPlanRead_ } from '../models/ApiResponse_FilmIndustrialPlanRead_';
 import type { ApiResponse_FilmIndustrialRunRead_ } from '../models/ApiResponse_FilmIndustrialRunRead_';
+import type { ApiResponse_FilmWorkflowMutationRead_ } from '../models/ApiResponse_FilmWorkflowMutationRead_';
+import type { ApiResponse_FilmWorkflowStateRead_ } from '../models/ApiResponse_FilmWorkflowStateRead_';
 import type { ApiResponse_GenerationTaskLinkRead_ } from '../models/ApiResponse_GenerationTaskLinkRead_';
 import type { ApiResponse_NoneType_ } from '../models/ApiResponse_NoneType_';
 import type { ApiResponse_PaginatedData_GenerationTaskLinkRead__ } from '../models/ApiResponse_PaginatedData_GenerationTaskLinkRead__';
@@ -17,6 +19,8 @@ import type { ApiResponse_TaskStatusRead_ } from '../models/ApiResponse_TaskStat
 import type { ApiResponse_VideoPromptPreviewResponse_ } from '../models/ApiResponse_VideoPromptPreviewResponse_';
 import type { FilmIndustrialPlanRequest } from '../models/FilmIndustrialPlanRequest';
 import type { FilmIndustrialRunRequest } from '../models/FilmIndustrialRunRequest';
+import type { FilmWorkflowRegenerateRequest } from '../models/FilmWorkflowRegenerateRequest';
+import type { FilmWorkflowStatePatchRequest } from '../models/FilmWorkflowStatePatchRequest';
 import type { GenerationTaskLinkCreate } from '../models/GenerationTaskLinkCreate';
 import type { GenerationTaskLinkUpdate } from '../models/GenerationTaskLinkUpdate';
 import type { ShotFramePromptRequest } from '../models/ShotFramePromptRequest';
@@ -53,6 +57,94 @@ export class FilmService {
             query: {
                 'chapter_id': chapterId,
             },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * 读取 CineForge 可编辑工作流状态
+     * Load or initialize the persisted CineForge workflow state for this scope.
+     * @returns ApiResponse_FilmWorkflowStateRead_ Successful Response
+     * @throws ApiError
+     */
+    public static loadWorkflowState({
+        projectId,
+        chapterId,
+    }: {
+        projectId: string,
+        /**
+         * 可选章节 ID；为空时按项目聚合
+         */
+        chapterId?: (string | null),
+    }): CancelablePromise<ApiResponse_FilmWorkflowStateRead_> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/film/industrial/projects/{project_id}/workflow-state',
+            path: {
+                'project_id': projectId,
+            },
+            query: {
+                'chapter_id': chapterId,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * 编辑 CineForge 工作流阶段
+     * Merge an operator patch into one persisted workflow stage and ledger it.
+     * @returns ApiResponse_FilmWorkflowMutationRead_ Successful Response
+     * @throws ApiError
+     */
+    public static editWorkflowState({
+        projectId,
+        stageKey,
+        requestBody,
+    }: {
+        projectId: string,
+        stageKey: string,
+        requestBody: FilmWorkflowStatePatchRequest,
+    }): CancelablePromise<ApiResponse_FilmWorkflowMutationRead_> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}',
+            path: {
+                'project_id': projectId,
+                'stage_key': stageKey,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * 重生成 CineForge 工作流阶段
+     * Queue a targeted regeneration task while preserving approved workflow state.
+     * @returns ApiResponse_FilmWorkflowMutationRead_ Successful Response
+     * @throws ApiError
+     */
+    public static regenerateWorkflowStage({
+        projectId,
+        stageKey,
+        requestBody,
+    }: {
+        projectId: string,
+        stageKey: string,
+        requestBody: FilmWorkflowRegenerateRequest,
+    }): CancelablePromise<ApiResponse_FilmWorkflowMutationRead_> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/regenerate',
+            path: {
+                'project_id': projectId,
+                'stage_key': stageKey,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
             errors: {
                 422: `Validation Error`,
             },

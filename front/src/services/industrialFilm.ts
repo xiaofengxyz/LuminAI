@@ -9,6 +9,11 @@ import type {
   FilmIndustrialPlanRequest,
   FilmIndustrialRunRead,
   FilmIndustrialRunRequest,
+  FilmWorkflowMutationRead,
+  FilmWorkflowRegenerateRequest,
+  FilmWorkflowStageRead,
+  FilmWorkflowStatePatchRequest,
+  FilmWorkflowStateRead,
   FilmNextActionRead,
   FilmPainPointRead,
   FilmPipelineStageRead,
@@ -35,7 +40,10 @@ export type FilmQueuedTask = FilmQueuedTaskRead
 export type FilmIndustrialOverview = FilmIndustrialOverviewRead
 export type FilmIndustrialPlan = FilmIndustrialPlanRead
 export type FilmIndustrialRun = FilmIndustrialRunRead
-export type { FilmIndustrialPlanRequest, FilmIndustrialRunRequest }
+export type FilmWorkflowStage = FilmWorkflowStageRead
+export type FilmWorkflowState = FilmWorkflowStateRead
+export type FilmWorkflowMutation = FilmWorkflowMutationRead
+export type { FilmIndustrialPlanRequest, FilmIndustrialRunRequest, FilmWorkflowStatePatchRequest, FilmWorkflowRegenerateRequest }
 
 type FilmApiResponse<T> =
   {
@@ -53,6 +61,29 @@ function requireData<T>(response: FilmApiResponse<T>): T {
 export async function loadIndustrialOverview(projectId: string, chapterId?: string | null) {
   const response = await FilmService.loadIndustrialOverview({ projectId, chapterId })
   return requireData<FilmIndustrialOverview>(response)
+}
+
+export async function loadWorkflowState(projectId: string, chapterId?: string | null) {
+  const response = await FilmService.loadWorkflowState({ projectId, chapterId })
+  return requireData<FilmWorkflowState>(response)
+}
+
+export async function editWorkflowState(
+  projectId: string,
+  stageKey: string,
+  body: FilmWorkflowStatePatchRequest,
+) {
+  const response = await FilmService.editWorkflowState({ projectId, stageKey, requestBody: body })
+  return requireData<FilmWorkflowMutation>(response)
+}
+
+export async function regenerateWorkflowStage(
+  projectId: string,
+  stageKey: string,
+  body: FilmWorkflowRegenerateRequest,
+) {
+  const response = await FilmService.regenerateWorkflowStage({ projectId, stageKey, requestBody: body })
+  return requireData<FilmWorkflowMutation>(response)
 }
 
 export async function createIndustrialPlan(projectId: string, body: FilmIndustrialPlanRequest = {}) {

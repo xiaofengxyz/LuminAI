@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -29,15 +29,21 @@ from app.models.studio import (
     ShotFrameImage,
     ShotStatus,
 )
+from app.models.industrial import CineForgeWorkflowState
 from app.models.task import GenerationTask, GenerationTaskStatus
 from app.models.task_links import GenerationTaskLink, GenerationTaskLinkStatus
 from app.schemas.common import ApiResponse, success_response
 from app.services.common import entity_not_found
 from app.services.industrial_film_core import (
     IndustrialProjectSnapshot,
+    build_cineforge_regenerate_payload,
+    build_cineforge_workflow_state,
     build_closed_loop_plan,
     build_industrial_overview,
     build_writeback_summary,
+    ensure_cineforge_stage,
+    mark_cineforge_regeneration_queued,
+    patch_cineforge_stage_data,
 )
 
 router = APIRouter(prefix="/industrial")
@@ -221,6 +227,58 @@ class FilmIndustrialRunRead(BaseModel):
     overview: FilmIndustrialOverviewRead
 
 
+class FilmWorkflowStageRead(BaseModel):
+    key: str
+    title: str
+    owner: str
+    prompt_file: str
+    editable: bool
+    regeneratable: bool
+    qa_gate: str
+    status: dict[str, Any]
+    data: dict[str, Any]
+
+
+class FilmWorkflowStateRead(BaseModel):
+    id: str
+    workflow_key: str
+    version: int
+    status: str
+    scope: dict[str, Any]
+    persisted: bool
+    stage_count: int
+    stages: list[FilmWorkflowStageRead]
+    stage_data: dict[str, Any]
+    stage_status: dict[str, Any]
+    edit_log: list[dict[str, Any]]
+    regenerate_log: list[dict[str, Any]]
+    last_task_id: str | None = None
+    edit_contract: dict[str, Any]
+    regenerate_contract: dict[str, Any]
+
+
+class FilmWorkflowStatePatchRequest(BaseModel):
+    chapter_id: str | None = Field(None, description="可选章节 ID；为空时编辑项目级工作流")
+    actor: str = Field("operator", description="编辑者标识")
+    note: str = Field("", description="本次编辑说明")
+    patch: dict[str, Any] = Field(default_factory=dict, description="结构化阶段补丁")
+
+
+class FilmWorkflowRegenerateRequest(BaseModel):
+    chapter_id: str | None = Field(None, description="可选章节 ID；为空时重生成项目级工作流阶段")
+    actor: str = Field("operator", description="操作者标识")
+    reason: str = Field("operator_requested", description="重生成原因")
+    patch: dict[str, Any] = Field(default_factory=dict, description="重生成时附加的结构化约束")
+    provider: str = Field("runtime_adapter", description="重生成任务供应商逻辑名")
+    model: str = Field("project_default_model", description="重生成任务模型逻辑名")
+
+
+class FilmWorkflowMutationRead(BaseModel):
+    workflow: FilmWorkflowStateRead
+    task: FilmQueuedTaskRead | None = None
+    event: dict[str, Any]
+
+
 @router.get(
     "/projects/{project_id}/overview",
     response_model=ApiResponse[FilmIndustrialOverviewRead],
@@ -236,6 +294,156 @@ async def get_industrial_overview(
 
     snapshot = await load_industrial_snapshot(db, project_id=project_id, chapter_id=chapter_id)
     payload = FilmIndustrialOverviewRead.model_validate(build_industrial_overview(snapshot))
+    return success_response(payload)
+
+
+@router.get(
+    "/projects/{project_id}/workflow-state",
+    response_model=ApiResponse[FilmWorkflowStateRead],
+    summary="读取 CineForge 可编辑工作流状态",
+    operation_id="loadWorkflowState",
+)
+async def get_workflow_state(
+    project_id: str,
+    chapter_id: str | None = Query(None, description="可选章节 ID；为空时按项目聚合"),
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[FilmWorkflowStateRead]:
+    """Load or initialize the persisted CineForge workflow state for this scope."""
+
+    snapshot = await load_industrial_snapshot(db, project_id=project_id, chapter_id=chapter_id)
+    row = await _load_or_create_workflow_state(db, snapshot)
+    payload = FilmWorkflowStateRead.model_validate(_workflow_state_payload(snapshot, row))
+    return success_response(payload)
+
+
+@router.patch(
+    "/projects/{project_id}/workflow-state/{stage_key}",
+    response_model=ApiResponse[FilmWorkflowMutationRead],
+    summary="编辑 CineForge 工作流阶段",
+    operation_id="editWorkflowState",
+)
+async def edit_workflow_state(
+    project_id: str,
+    stage_key: str,
+    body: FilmWorkflowStatePatchRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[FilmWorkflowMutationRead]:
+    """Merge an operator patch into one persisted workflow stage and ledger it."""
+
+    try:
+        ensure_cineforge_stage(stage_key)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    snapshot = await load_industrial_snapshot(db, project_id=project_id, chapter_id=body.chapter_id)
+    row = await _load_or_create_workflow_state(db, snapshot)
+    next_version = int(row.version or 1) + 1
+    stage_data, stage_status, edit_entry = patch_cineforge_stage_data(
+        current_stage_data=row.stage_data or {},
+        current_stage_status=row.stage_status or {},
+        stage_key=stage_key,
+        patch=body.patch,
+        actor=body.actor,
+        note=body.note,
+        next_version=next_version,
+    )
+    task = await _record_workflow_task(
+        db,
+        workflow_id=row.id,
+        task_kind="cineforge_workflow_edit",
+        payload={
+            "workflow_id": row.id,
+            "stage_key": stage_key,
+            "actor": body.actor,
+            "note": body.note,
+            "patch": body.patch,
+            "version": next_version,
+        },
+        terminal=True,
+        purpose="persist operator edit for a CineForge workflow stage",
+    )
+    row.version = next_version
+    row.status = "edited"
+    row.stage_data = stage_data
+    row.stage_status = stage_status
+    row.edit_log = [*(row.edit_log or []), {**edit_entry, "task_id": task["task_id"]}]
+    row.last_task_id = task["task_id"]
+    await db.flush()
+    await db.refresh(row)
+
+    payload = FilmWorkflowMutationRead.model_validate(
+        {
+            "workflow": _workflow_state_payload(snapshot, row),
+            "task": task,
+            "event": row.edit_log[-1],
+        }
+    )
+    return success_response(payload)
+
+
+@router.post(
+    "/projects/{project_id}/workflow-state/{stage_key}/regenerate",
+    response_model=ApiResponse[FilmWorkflowMutationRead],
+    summary="重生成 CineForge 工作流阶段",
+    operation_id="regenerateWorkflowStage",
+)
+async def regenerate_workflow_stage(
+    project_id: str,
+    stage_key: str,
+    body: FilmWorkflowRegenerateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[FilmWorkflowMutationRead]:
+    """Queue a targeted regeneration task while preserving approved workflow state."""
+
+    try:
+        ensure_cineforge_stage(stage_key)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    snapshot = await load_industrial_snapshot(db, project_id=project_id, chapter_id=body.chapter_id)
+    row = await _load_or_create_workflow_state(db, snapshot)
+    next_version = int(row.version or 1) + 1
+    task_payload = build_cineforge_regenerate_payload(
+        snapshot=snapshot,
+        workflow_id=row.id,
+        stage_key=stage_key,
+        reason=body.reason,
+        patch=body.patch,
+        provider=body.provider,
+        model=body.model,
+        next_version=next_version,
+    )
+    task = await _record_workflow_task(
+        db,
+        workflow_id=row.id,
+        task_kind="cineforge_stage_regenerate",
+        payload=task_payload,
+        terminal=False,
+        purpose="queue targeted CineForge stage regeneration",
+    )
+    stage_status, regenerate_entry = mark_cineforge_regeneration_queued(
+        current_stage_status=row.stage_status or {},
+        stage_key=stage_key,
+        task_id=task["task_id"],
+        actor=body.actor,
+        reason=body.reason,
+        next_version=next_version,
+    )
+    row.version = next_version
+    row.status = "regenerating"
+    row.stage_status = stage_status
+    row.regenerate_log = [*(row.regenerate_log or []), regenerate_entry]
+    row.last_task_id = task["task_id"]
+    await db.flush()
+    await db.refresh(row)
+
+    payload = FilmWorkflowMutationRead.model_validate(
+        {
+            "workflow": _workflow_state_payload(snapshot, row),
+            "task": task,
+            "event": row.regenerate_log[-1],
+        }
+    )
     return success_response(payload)
 
 
@@ -376,6 +584,116 @@ async def load_industrial_snapshot(
         shot_ids=tuple(shot_ids),
         ready_shot_ids=tuple(ready_shot_ids),
         generated_video_shot_ids=tuple(generated_video_shot_ids),
+    )
+
+
+async def _load_or_create_workflow_state(
+    db: AsyncSession,
+    snapshot: IndustrialProjectSnapshot,
+) -> CineForgeWorkflowState:
+    await _ensure_workflow_state_table(db)
+    stmt = select(CineForgeWorkflowState).where(
+        CineForgeWorkflowState.project_id == snapshot.project_id,
+        CineForgeWorkflowState.workflow_key == "cineforge_ai_drama_os",
+    )
+    if snapshot.chapter_id is None:
+        stmt = stmt.where(CineForgeWorkflowState.chapter_id.is_(None))
+    else:
+        stmt = stmt.where(CineForgeWorkflowState.chapter_id == snapshot.chapter_id)
+
+    row = (await db.execute(stmt.limit(1))).scalars().first()
+    if row is not None:
+        return row
+
+    # The first read persists a recoverable baseline so later edits are diffs.
+    row = CineForgeWorkflowState(
+        id=f"cfwf-{uuid4().hex[:12]}",
+        project_id=snapshot.project_id,
+        chapter_id=snapshot.chapter_id,
+        workflow_key="cineforge_ai_drama_os",
+        status="draft",
+        version=1,
+        stage_data={},
+        stage_status={},
+        edit_log=[],
+        regenerate_log=[],
+    )
+    db.add(row)
+    await db.flush()
+    await db.refresh(row)
+    return row
+
+
+async def _ensure_workflow_state_table(db: AsyncSession) -> None:
+    # Existing local Jellyfish databases may predate this Film Core table.
+    connection = await db.connection()
+    await connection.run_sync(lambda sync_conn: CineForgeWorkflowState.__table__.create(sync_conn, checkfirst=True))
+
+
+def _workflow_state_payload(
+    snapshot: IndustrialProjectSnapshot,
+    row: CineForgeWorkflowState,
+) -> dict[str, Any]:
+    return build_cineforge_workflow_state(
+        snapshot,
+        workflow_id=row.id,
+        status=row.status,
+        version=int(row.version or 1),
+        stage_data=row.stage_data or {},
+        stage_status=row.stage_status or {},
+        edit_log=row.edit_log or [],
+        regenerate_log=row.regenerate_log or [],
+        last_task_id=row.last_task_id,
+    )
+
+
+async def _record_workflow_task(
+    db: AsyncSession,
+    *,
+    workflow_id: str,
+    task_kind: str,
+    payload: dict[str, Any],
+    terminal: bool,
+    purpose: str,
+) -> dict[str, Any]:
+    store = SqlAlchemyTaskStore(db)
+    task = await store.create(
+        payload=payload,
+        mode=DeliveryMode.async_polling,
+        task_kind=task_kind,
+    )
+    status_value = GenerationTaskStatus.pending.value
+    progress = 0
+    link_status = GenerationTaskLinkStatus.todo
+    if terminal:
+        row = await db.get(GenerationTask, task.id)
+        if row is not None:
+            row.status = GenerationTaskStatus.succeeded
+            row.progress = 100
+            row.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            row.result = {"message": purpose, "workflow_id": workflow_id}
+        status_value = GenerationTaskStatus.succeeded.value
+        progress = 100
+        link_status = GenerationTaskLinkStatus.accepted
+
+    db.add(
+        GenerationTaskLink(
+            task_id=task.id,
+            resource_type="workflow",
+            relation_type="cineforge_workflow_stage",
+            relation_entity_id=workflow_id,
+            status=link_status,
+        )
+    )
+    return _queued_task(
+        task_id=task.id,
+        task_kind=task_kind,
+        resource_type="workflow",
+        relation_type="cineforge_workflow_stage",
+        relation_entity_id=workflow_id,
+        status_value=status_value,
+        progress=progress,
+        purpose=purpose,
     )
 
 
@@ -555,7 +873,7 @@ async def _create_run_tasks(
         if row is not None:
             row.status = GenerationTaskStatus.succeeded
             row.progress = 100
-            row.finished_at = datetime.now(UTC).replace(tzinfo=None)
+            row.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
             row.result = {"message": "No renderable shots yet; resolve Film Core blockers first."}
         db.add(
             GenerationTaskLink(

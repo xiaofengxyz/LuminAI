@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -199,6 +201,91 @@ IMPLEMENTATION_PHASES: list[dict[str, str]] = [
 ]
 
 
+CINEFORGE_WORKFLOW_STAGES: list[dict[str, Any]] = [
+    {
+        "key": "workflow_architecture",
+        "title": "Workflow-First Architecture",
+        "owner": "Jellyfish Workflow Core",
+        "prompt_file": "01_WORKFLOW_ARCHITECTURE_PROMPT.md",
+        "editable": True,
+        "regeneratable": True,
+        "qa_gate": "graph_state_integrity",
+    },
+    {
+        "key": "novel_engine",
+        "title": "Novel Engine",
+        "owner": "Story System",
+        "prompt_file": "02_STAGE1_NOVEL_ENGINE_PROMPT.md",
+        "editable": True,
+        "regeneratable": True,
+        "qa_gate": "story_continuity",
+    },
+    {
+        "key": "asset_pipeline",
+        "title": "Drama Asset Pipeline",
+        "owner": "Character / Scene Bible",
+        "prompt_file": "03_STAGE2_ASSET_PIPELINE_PROMPT.md",
+        "editable": True,
+        "regeneratable": True,
+        "qa_gate": "asset_consistency",
+    },
+    {
+        "key": "image_runtime",
+        "title": "Image Runtime",
+        "owner": "FLUX / SDXL / StoryDiffusion / ComfyUI Adapter",
+        "prompt_file": "04_STAGE3_IMAGE_RUNTIME_PROMPT.md",
+        "editable": True,
+        "regeneratable": True,
+        "qa_gate": "reference_image_quality",
+    },
+    {
+        "key": "video_runtime",
+        "title": "Video Runtime",
+        "owner": "Seedance / Kling / Veo / Wan / Sora Adapter",
+        "prompt_file": "05_STAGE4_VIDEO_RUNTIME_PROMPT.md",
+        "editable": True,
+        "regeneratable": True,
+        "qa_gate": "shot_motion_quality",
+    },
+    {
+        "key": "qa_retry_engine",
+        "title": "QA And Retry Engine",
+        "owner": "Closed-Loop QA",
+        "prompt_file": "06_QA_RETRY_ENGINE_PROMPT.md",
+        "editable": True,
+        "regeneratable": True,
+        "qa_gate": "retry_patch_quality",
+    },
+    {
+        "key": "studio_ui",
+        "title": "CineForge Studio UI",
+        "owner": "Jellyfish Project Workbench",
+        "prompt_file": "07_STUDIO_UI_PROMPT.md",
+        "editable": True,
+        "regeneratable": False,
+        "qa_gate": "operator_surface_complete",
+    },
+    {
+        "key": "data_schema",
+        "title": "Production Data Schema",
+        "owner": "Workflow State Ledger",
+        "prompt_file": "08_DATA_SCHEMA_PROMPT.md",
+        "editable": True,
+        "regeneratable": True,
+        "qa_gate": "schema_contract_complete",
+    },
+    {
+        "key": "final_integration",
+        "title": "AI Drama Operating System",
+        "owner": "Industrial Production Loop",
+        "prompt_file": "09_FINAL_INTEGRATION_PROMPT.md",
+        "editable": True,
+        "regeneratable": True,
+        "qa_gate": "end_to_end_executable",
+    },
+]
+
+
 @dataclass(frozen=True)
 class IndustrialProjectSnapshot:
     project_id: str
@@ -385,6 +472,365 @@ def build_writeback_summary(snapshot: IndustrialProjectSnapshot) -> dict[str, An
             "Provider workers attach files and update shots after real rendering completes."
         ),
     }
+
+
+def build_cineforge_workflow_state(
+    snapshot: IndustrialProjectSnapshot,
+    *,
+    workflow_id: str | None = None,
+    status: str = "draft",
+    version: int = 1,
+    stage_data: dict[str, Any] | None = None,
+    stage_status: dict[str, Any] | None = None,
+    edit_log: list[dict[str, Any]] | None = None,
+    regenerate_log: list[dict[str, Any]] | None = None,
+    last_task_id: str | None = None,
+) -> dict[str, Any]:
+    """Build the persisted CineForge workflow ledger for API/UI consumption."""
+
+    default_data = _default_cineforge_stage_data(snapshot)
+    merged_data = _deep_merge(default_data, stage_data or {})
+    default_status = _default_cineforge_stage_status(snapshot)
+    merged_status = _deep_merge(default_status, stage_status or {})
+    stage_entries = []
+    for stage in CINEFORGE_WORKFLOW_STAGES:
+        key = str(stage["key"])
+        stage_entries.append(
+            {
+                **stage,
+                "status": merged_status.get(key, {}),
+                "data": merged_data.get(key, {}),
+            }
+        )
+
+    return {
+        "id": workflow_id or "",
+        "workflow_key": "cineforge_ai_drama_os",
+        "version": version,
+        "status": status,
+        "scope": {
+            "project_id": snapshot.project_id,
+            "project_name": snapshot.project_name,
+            "chapter_id": snapshot.chapter_id,
+            "chapter_title": snapshot.chapter_title,
+        },
+        "persisted": bool(workflow_id),
+        "stage_count": len(CINEFORGE_WORKFLOW_STAGES),
+        "stages": stage_entries,
+        "stage_data": merged_data,
+        "stage_status": merged_status,
+        "edit_log": list(edit_log or []),
+        "regenerate_log": list(regenerate_log or []),
+        "last_task_id": last_task_id,
+        "edit_contract": {
+            "method": "PATCH",
+            "path": "/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}",
+            "effect": "Merges a structured patch into the persisted stage data and increments the workflow version.",
+        },
+        "regenerate_contract": {
+            "method": "POST",
+            "path": "/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/regenerate",
+            "effect": "Creates a Jellyfish generation task for targeted regeneration without discarding approved stages.",
+        },
+    }
+
+
+def patch_cineforge_stage_data(
+    *,
+    current_stage_data: dict[str, Any],
+    current_stage_status: dict[str, Any],
+    stage_key: str,
+    patch: dict[str, Any],
+    actor: str,
+    note: str,
+    next_version: int,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Apply an operator edit to one workflow stage without touching other stages."""
+
+    ensure_cineforge_stage(stage_key)
+    stage_data = deepcopy(current_stage_data)
+    stage_status = deepcopy(current_stage_status)
+    stage_data[stage_key] = _deep_merge(stage_data.get(stage_key, {}), patch)
+    stage_status[stage_key] = _deep_merge(
+        stage_status.get(stage_key, {}),
+        {
+            "state": "edited",
+            "revision": next_version,
+            "last_actor": actor,
+            "last_note": note,
+            "updated_at": _utc_now_iso(),
+        },
+    )
+    edit_entry = {
+        "stage_key": stage_key,
+        "actor": actor,
+        "note": note,
+        "patch": patch,
+        "version": next_version,
+        "created_at": _utc_now_iso(),
+    }
+    return stage_data, stage_status, edit_entry
+
+
+def build_cineforge_regenerate_payload(
+    *,
+    snapshot: IndustrialProjectSnapshot,
+    workflow_id: str,
+    stage_key: str,
+    reason: str,
+    patch: dict[str, Any],
+    provider: str,
+    model: str,
+    next_version: int,
+) -> dict[str, Any]:
+    """Create a task payload that can later be consumed by provider-specific workers."""
+
+    stage = ensure_cineforge_stage(stage_key)
+    return {
+        "workflow_id": workflow_id,
+        "workflow_key": "cineforge_ai_drama_os",
+        "stage_key": stage_key,
+        "stage_title": stage["title"],
+        "reason": reason,
+        "patch": patch,
+        "provider": provider,
+        "model": model,
+        "version": next_version,
+        "project_id": snapshot.project_id,
+        "chapter_id": snapshot.chapter_id,
+        "source_counts": {
+            "script_chars": snapshot.script_text_length,
+            "shots": snapshot.shot_count,
+            "ready_shots": snapshot.ready_shot_count,
+            "generated_videos": snapshot.generated_video_count,
+            "characters": snapshot.character_count,
+            "asset_links": (
+                snapshot.actor_link_count
+                + snapshot.scene_link_count
+                + snapshot.prop_link_count
+                + snapshot.costume_link_count
+            ),
+        },
+        "qa_gate": stage["qa_gate"],
+    }
+
+
+def mark_cineforge_regeneration_queued(
+    *,
+    current_stage_status: dict[str, Any],
+    stage_key: str,
+    task_id: str,
+    actor: str,
+    reason: str,
+    next_version: int,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Mark a stage as queued for regeneration and return a history row."""
+
+    ensure_cineforge_stage(stage_key)
+    stage_status = deepcopy(current_stage_status)
+    stage_status[stage_key] = _deep_merge(
+        stage_status.get(stage_key, {}),
+        {
+            "state": "regeneration_queued",
+            "revision": next_version,
+            "last_task_id": task_id,
+            "last_actor": actor,
+            "last_note": reason,
+            "updated_at": _utc_now_iso(),
+        },
+    )
+    entry = {
+        "stage_key": stage_key,
+        "actor": actor,
+        "reason": reason,
+        "task_id": task_id,
+        "version": next_version,
+        "created_at": _utc_now_iso(),
+    }
+    return stage_status, entry
+
+
+def ensure_cineforge_stage(stage_key: str) -> dict[str, Any]:
+    """Return the workflow stage spec or raise a clear error for invalid keys."""
+
+    for stage in CINEFORGE_WORKFLOW_STAGES:
+        if stage["key"] == stage_key:
+            return stage
+    valid = ", ".join(str(stage["key"]) for stage in CINEFORGE_WORKFLOW_STAGES)
+    raise KeyError(f"Unknown CineForge workflow stage '{stage_key}'. Valid stages: {valid}")
+
+
+def _default_cineforge_stage_data(snapshot: IndustrialProjectSnapshot) -> dict[str, Any]:
+    shot_refs = list(snapshot.shot_ids or snapshot.ready_shot_ids)
+    return {
+        "workflow_architecture": {
+            "graph_order": [str(stage["key"]) for stage in CINEFORGE_WORKFLOW_STAGES],
+            "persistence": "cineforge_workflow_states",
+            "jellyfish_reuse": [
+                "projects",
+                "chapters",
+                "shots",
+                "project_*_links",
+                "generation_tasks",
+                "generation_task_links",
+            ],
+            "recoverability": "all operator edits and regeneration tasks are versioned",
+        },
+        "novel_engine": {
+            "world_bible": {
+                "title": snapshot.project_name,
+                "style": snapshot.project_style,
+                "visual_style": snapshot.visual_style,
+                "seed": snapshot.seed,
+                "unify_style": snapshot.unify_style,
+            },
+            "relationship_graph": {
+                "character_count": snapshot.character_count,
+                "actor_link_count": snapshot.actor_link_count,
+            },
+            "chapter_outline": {
+                "chapter_count": snapshot.chapter_count,
+                "focus_chapter": snapshot.chapter_title,
+                "script_chars": snapshot.script_text_length,
+                "condensed_chars": snapshot.condensed_text_length,
+            },
+            "cliffhanger_engine": {
+                "policy": "each episode keeps an unresolved emotional or plot question",
+                "candidate_source": "chapter ending + next chapter setup",
+            },
+        },
+        "asset_pipeline": {
+            "character_bible": {
+                "character_count": snapshot.character_count,
+                "identity_links": snapshot.actor_link_count,
+            },
+            "scene_bible": {
+                "scene_links": snapshot.scene_link_count,
+                "lighting_policy": "reuse scene references and lock lighting per shot",
+            },
+            "shot_graph": {
+                "shot_count": snapshot.shot_count,
+                "ready_shots": snapshot.ready_shot_count,
+                "shot_refs": shot_refs,
+            },
+            "storyboard": {
+                "frame_image_count": snapshot.frame_image_count,
+                "dialogue_line_count": snapshot.dialogue_line_count,
+            },
+        },
+        "image_runtime": {
+            "adapters": ["flux", "sdxl", "storydiffusion", "comfyui"],
+            "contract": "image requests must be compiled from character, scene, shot, and storyboard state",
+            "reference_policy": ["identity lock", "costume lock", "scene keyframe", "first/key/last frame"],
+        },
+        "video_runtime": {
+            "adapters": ["seedance", "kling", "veo", "wan2.1", "sora"],
+            "contract": "video requests stay provider-neutral until runtime dispatch",
+            "shot_constraints": ["duration", "ratio", "camera movement", "reference images", "negative drift terms"],
+        },
+        "qa_retry_engine": {
+            "qa_policy": {
+                "face_similarity_min": 0.86,
+                "outfit_similarity_min": 0.82,
+                "clip_score_min": 0.28,
+                "continuity_checks": ["identity", "costume", "scene/light", "action completion"],
+            },
+            "retry_policy": {
+                "max_attempts": 3,
+                "target": "only failed shots",
+                "patches": ["increase reference strength", "lock costume", "lower randomness"],
+            },
+            "current_inputs": {
+                "generated_or_accepted_videos": snapshot.generated_video_count + snapshot.accepted_video_task_count,
+                "planned_retry_candidates": max(0, snapshot.ready_shot_count - snapshot.generated_video_count),
+            },
+        },
+        "studio_ui": {
+            "surfaces": [
+                "Projects -> Film Core",
+                "Project Workbench -> Film Core",
+                "/projects/{projectId}?tab=filmCore",
+            ],
+            "operator_actions": ["load workflow state", "edit stage", "queue stage regeneration", "create production tasks"],
+        },
+        "data_schema": {
+            "schema_version": "cineforge.workflow.v1",
+            "entities": [
+                "workflow_state",
+                "stage_data",
+                "stage_status",
+                "edit_log",
+                "regenerate_log",
+                "generation_task_link",
+            ],
+            "state_boundary": "Jellyfish owns persistence; provider workers own execution results.",
+        },
+        "final_integration": {
+            "operating_system": "AI Drama Operating System",
+            "workflow": [stage["key"] for stage in PIPELINE_STAGES],
+            "batch_policy": "episode-by-episode closed loop with shared bibles and per-shot QA",
+            "export_policy": "approved clips are handed to post-production for subtitles, audio, transitions, and final delivery",
+        },
+    }
+
+
+def _default_cineforge_stage_status(snapshot: IndustrialProjectSnapshot) -> dict[str, Any]:
+    generated_or_accepted = snapshot.generated_video_count + snapshot.accepted_video_task_count
+    return {
+        "workflow_architecture": _workflow_stage_status("ready", "state ledger and task ledger are available"),
+        "novel_engine": _workflow_stage_status(
+            "done" if snapshot.has_script else "blocked",
+            f"script={snapshot.script_text_length}, condensed={snapshot.condensed_text_length}",
+        ),
+        "asset_pipeline": _workflow_stage_status(
+            "done" if snapshot.has_asset_bible else "needs_input",
+            (
+                f"characters={snapshot.character_count}, actor_links={snapshot.actor_link_count}, "
+                f"scene_links={snapshot.scene_link_count}, prop_links={snapshot.prop_link_count}, "
+                f"costume_links={snapshot.costume_link_count}"
+            ),
+        ),
+        "image_runtime": _workflow_stage_status(
+            "ready" if snapshot.ready_shot_count > 0 else "waiting",
+            f"frame_images={snapshot.frame_image_count}, ready_shots={snapshot.ready_shot_count}",
+        ),
+        "video_runtime": _workflow_stage_status(
+            "ready" if snapshot.ready_shot_count > 0 else "waiting",
+            f"ready_shots={snapshot.ready_shot_count}, generated_videos={snapshot.generated_video_count}",
+        ),
+        "qa_retry_engine": _workflow_stage_status(
+            "ready" if generated_or_accepted > 0 else "waiting",
+            f"qa_inputs={generated_or_accepted}",
+        ),
+        "studio_ui": _workflow_stage_status("done", "Film Core tab is mounted in Jellyfish Project Workbench"),
+        "data_schema": _workflow_stage_status("ready", "workflow_state JSON schema is versioned"),
+        "final_integration": _workflow_stage_status(
+            "ready" if snapshot.ready_shot_count > 0 else "blocked",
+            f"pipeline_nodes={len(PIPELINE_STAGES)}, ready_shots={snapshot.ready_shot_count}",
+        ),
+    }
+
+
+def _workflow_stage_status(state: str, evidence: str) -> dict[str, Any]:
+    return {
+        "state": state,
+        "evidence": evidence,
+        "revision": 1,
+    }
+
+
+def _deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
+    result = deepcopy(base)
+    for key, value in patch.items():
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = deepcopy(value)
+    return result
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
 def _stage(

@@ -4,9 +4,12 @@ import {
   Button,
   Card,
   Col,
+  Divider,
   Empty,
+  Input,
   Progress,
   Row,
+  Select,
   Space,
   Spin,
   Statistic,
@@ -27,12 +30,16 @@ import { useParams } from 'react-router-dom'
 import {
   createIndustrialRun,
   createIndustrialPlan,
+  editWorkflowState,
   loadIndustrialOverview,
+  loadWorkflowState,
+  regenerateWorkflowStage,
   type FilmIndustrialOverview,
   type FilmIndustrialPlan,
   type FilmIndustrialRun,
   type FilmImplementationPhase,
   type FilmPipelineStage,
+  type FilmWorkflowState,
 } from '../../../../../services/industrialFilm'
 
 const { Text, Title, Paragraph } = Typography
@@ -85,11 +92,16 @@ function phaseTag(phase: FilmImplementationPhase) {
 export function FilmCoreTab() {
   const { projectId } = useParams<{ projectId: string }>()
   const [overview, setOverview] = useState<FilmIndustrialOverview | null>(null)
+  const [workflow, setWorkflow] = useState<FilmWorkflowState | null>(null)
   const [plan, setPlan] = useState<FilmIndustrialPlan | null>(null)
   const [run, setRun] = useState<FilmIndustrialRun | null>(null)
+  const [selectedStageKey, setSelectedStageKey] = useState('novel_engine')
+  const [workflowNote, setWorkflowNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [planning, setPlanning] = useState(false)
   const [running, setRunning] = useState(false)
+  const [savingWorkflow, setSavingWorkflow] = useState(false)
+  const [regeneratingWorkflow, setRegeneratingWorkflow] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const blockingActions = useMemo(
@@ -102,19 +114,78 @@ export function FilmCoreTab() {
       (overview.implementation_status.completed_phases / overview.implementation_status.total_phases) * 100,
     )
   }, [overview])
+  const selectedWorkflowStage = useMemo(
+    () => workflow?.stages.find((stage) => stage.key === selectedStageKey) ?? workflow?.stages[0],
+    [workflow, selectedStageKey],
+  )
 
   const refresh = async () => {
     if (!projectId) return
     setLoading(true)
     setError(null)
     try {
-      const data = await loadIndustrialOverview(projectId)
-      setOverview(data)
+      const [overviewData, workflowData] = await Promise.all([
+        loadIndustrialOverview(projectId),
+        loadWorkflowState(projectId),
+      ])
+      setOverview(overviewData)
+      setWorkflow(workflowData)
+      if (workflowData.stages.length > 0 && !workflowData.stages.some((stage) => stage.key === selectedStageKey)) {
+        setSelectedStageKey(workflowData.stages[0].key)
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Film Core 状态加载失败'
       setError(msg)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleWorkflowEdit = async () => {
+    if (!projectId || !selectedWorkflowStage) return
+    setSavingWorkflow(true)
+    try {
+      const note = workflowNote.trim() || 'operator stage edit'
+      const data = await editWorkflowState(projectId, selectedWorkflowStage.key, {
+        actor: 'studio_operator',
+        note,
+        patch: {
+          operator_note: note,
+          ui_saved_at: new Date().toISOString(),
+        },
+      })
+      setWorkflow(data.workflow)
+      message.success(`工作流阶段已保存到 v${data.workflow.version}`)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '工作流阶段保存失败'
+      message.error(msg)
+    } finally {
+      setSavingWorkflow(false)
+    }
+  }
+
+  const handleWorkflowRegenerate = async () => {
+    if (!projectId || !selectedWorkflowStage) return
+    setRegeneratingWorkflow(true)
+    try {
+      const reason = workflowNote.trim() || 'operator requested stage regeneration'
+      const data = await regenerateWorkflowStage(projectId, selectedWorkflowStage.key, {
+        actor: 'studio_operator',
+        reason,
+        provider: 'runtime_adapter',
+        model: 'project_default_model',
+        patch: {
+          preserve_approved_outputs: true,
+          target_stage: selectedWorkflowStage.key,
+        },
+      })
+      setWorkflow(data.workflow)
+      message.success(`已为 ${selectedWorkflowStage.title} 创建重生成任务`)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '工作流阶段重生成失败'
+      message.error(msg)
+    } finally {
+      setRegeneratingWorkflow(false)
     }
   }
 
@@ -295,6 +366,77 @@ export function FilmCoreTab() {
           ))}
         </div>
       </Card>
+
+      {workflow ? (
+        <Card
+          title="CineForge 可编辑工作流状态"
+          size="small"
+          extra={<Tag color="blue">{workflow.workflow_key} · v{workflow.version}</Tag>}
+        >
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={10}>
+              <Space direction="vertical" className="w-full" size="middle">
+                <Select
+                  className="w-full"
+                  value={selectedWorkflowStage?.key}
+                  onChange={setSelectedStageKey}
+                  options={workflow.stages.map((stage) => ({
+                    value: stage.key,
+                    label: `${stage.title} · ${stage.status.state ?? 'unknown'}`,
+                  }))}
+                />
+                <Input.TextArea
+                  rows={4}
+                  value={workflowNote}
+                  onChange={(event) => setWorkflowNote(event.target.value)}
+                  placeholder="记录本次阶段编辑或重生成原因"
+                />
+                <Space wrap>
+                  <Button
+                    type="primary"
+                    onClick={handleWorkflowEdit}
+                    loading={savingWorkflow}
+                    disabled={!selectedWorkflowStage?.editable}
+                  >
+                    保存阶段编辑
+                  </Button>
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={handleWorkflowRegenerate}
+                    loading={regeneratingWorkflow}
+                    disabled={!selectedWorkflowStage?.regeneratable}
+                  >
+                    重生成阶段
+                  </Button>
+                </Space>
+                <Text type="secondary" className="text-xs">
+                  最近任务：{workflow.last_task_id ?? '暂无'} · 编辑 {workflow.edit_log.length} 次 · 重生成 {workflow.regenerate_log.length} 次
+                </Text>
+              </Space>
+            </Col>
+            <Col xs={24} lg={14}>
+              {selectedWorkflowStage ? (
+                <div>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <Space wrap>
+                      <span className="font-medium">{selectedWorkflowStage.title}</span>
+                      <Tag>{selectedWorkflowStage.owner}</Tag>
+                      <Tag color="purple">{selectedWorkflowStage.qa_gate}</Tag>
+                    </Space>
+                    {stageTag(String(selectedWorkflowStage.status.state ?? 'waiting'))}
+                  </div>
+                  <Divider className="!my-3" />
+                  <pre className="max-h-72 overflow-auto rounded border border-gray-100 bg-gray-50 p-3 text-xs text-gray-700">
+                    {JSON.stringify(selectedWorkflowStage.data, null, 2)}
+                  </pre>
+                </div>
+              ) : (
+                <Empty description="暂无工作流阶段" />
+              )}
+            </Col>
+          </Row>
+        </Card>
+      ) : null}
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={14}>

@@ -4,6 +4,7 @@ from app.core.db import Base
 from app.models.base import TimestampMixin
 
 from app.models.llm import Model, ModelSettings, Provider
+from app.models.industrial import CineForgeWorkflowState
 from app.models.task import GenerationTask
 from app.models.task_links import GenerationTaskLink
 from app.models.types import FileUsageKind
@@ -72,6 +73,7 @@ __all__ = [
     "Provider",
     "Model",
     "ModelSettings",
+    "CineForgeWorkflowState",
     "GenerationTask",
     "GenerationTaskLink",
 ]
