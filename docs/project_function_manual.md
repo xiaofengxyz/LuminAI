@@ -48,6 +48,9 @@ Current implemented capabilities:
 - build closed-loop chapter plans with render requests, QA, retry, and optional post-production
 - track Jellyfish as a real upstream studio base under `vendor/jellyfish`
 - inspect Jellyfish base status, run commands, ports, and missing files
+- persist CineForge workflow state inside Jellyfish as nine editable stages
+- save stage-level operator edits with versioned task-ledger evidence
+- queue targeted stage regeneration without resetting approved project state
 - run a dependency-light HTTP/CLI smoke service that exposes health, a
   closed-loop demo production plan, Studio Dashboard UI, and status APIs
 
@@ -73,11 +76,9 @@ The latest bridge code is:
 The next product layers should be added in this order:
 
 1. Bind `JellyfishRecordMapper` to the tracked Jellyfish fork/API client.
-2. Write approved outputs and retry outcomes back into Jellyfish media, task,
-   and shot records.
-3. Expose QA, retry, post-production, and batch production controls in the
-   studio UI.
-4. Add provider-specific workers that execute the closed-loop plans while
+2. Write approved provider outputs and final retry outcomes back into Jellyfish
+   media and shot records after real workers finish.
+3. Add provider-specific workers that execute the closed-loop plans while
    keeping Film Core runtime-neutral.
 
 ---
@@ -325,9 +326,12 @@ Direct URL -> /projects/{project_id}?tab=filmCore
 Backend endpoints:
 
 ```text
-GET  /api/v1/film/industrial/projects/{project_id}/overview
-POST /api/v1/film/industrial/projects/{project_id}/plan
-POST /api/v1/film/industrial/projects/{project_id}/run
+GET   /api/v1/film/industrial/projects/{project_id}/overview
+GET   /api/v1/film/industrial/projects/{project_id}/workflow-state
+PATCH /api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}
+POST  /api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/regenerate
+POST  /api/v1/film/industrial/projects/{project_id}/plan
+POST  /api/v1/film/industrial/projects/{project_id}/run
 ```
 
 Local frontend runtime defaults to Jellyfish backend `http://localhost:8011`.
@@ -360,6 +364,29 @@ implementation_phases      Phase 1 through Phase 9 with owner, evidence, and cod
 This is rendered in the `Film Core` tab as the `九阶段交付状态` panel, so the
 producer can see that the nine implementation phases are complete without
 opening repository docs.
+
+The workflow-state endpoints persist the CineForge Prompt workflow as nine
+editable stages:
+
+```text
+workflow_architecture
+novel_engine
+asset_pipeline
+image_runtime
+video_runtime
+qa_retry_engine
+studio_ui
+data_schema
+final_integration
+```
+
+`GET /workflow-state` initializes or loads `cineforge_workflow_states`.
+`PATCH /workflow-state/{stage_key}` merges a structured operator patch, bumps
+the workflow version, and writes a succeeded `cineforge_workflow_edit` task.
+`POST /workflow-state/{stage_key}/regenerate` queues a pending
+`cineforge_stage_regenerate` task linked to the same workflow. This is the
+edit/regenerate loop required by the CineForge prompts, and it reuses Jellyfish
+task tables instead of inventing a second queue.
 
 The plan endpoint returns a preview contract for render queue entries, QA
 thresholds, retry repair patches, post-production steps, and current blockers.
@@ -396,6 +423,8 @@ Implemented:
 - character, costume, prop, scene, and shot continuity scoring
 - automatic QA policy and retry repair-patch planning
 - batch render queue planning
+- persisted nine-stage CineForge workflow state
+- stage-level edit and targeted regeneration controls
 - Jellyfish-native Project Workbench `Film Core` tab
 - task-center writeback through `generation_tasks` and `generation_task_links`
 - CORS/runtime defaults for `7790 -> 8011`
@@ -416,6 +445,8 @@ Industry pain points addressed:
 - vendor lock-in: runtime adapters keep providers behind one boundary
 - manual QA bottleneck: QA tasks and thresholds are structured and repeatable
 - expensive blind retry: Retry Engine produces targeted repair patches
+- destructive rework after edits: workflow stages are versioned and can be
+  regenerated one at a time
 - batch chaos: Film Core creates queueable tasks with task-link writeback
 
 Remaining production integration work is provider-specific worker binding and
@@ -585,7 +616,48 @@ If the page says the project has blockers, resolve them in the normal Jellyfish
 pages first. Film Core intentionally points back to the right production object
 instead of hiding problems behind a one-click button.
 
-### 12.7 Generate A Closed-Loop Plan
+### 12.7 Edit Or Regenerate CineForge Workflow State
+
+Use `CineForge 可编辑工作流状态` when the producer or director changes the plan
+after seeing the Film Core diagnosis.
+
+1. Select a stage:
+
+```text
+workflow_architecture
+novel_engine
+asset_pipeline
+image_runtime
+video_runtime
+qa_retry_engine
+studio_ui
+data_schema
+final_integration
+```
+
+2. Read the JSON preview for that stage. It shows the persisted world bible,
+shot graph, image/video runtime policy, QA policy, or integration contract that
+the engine will use.
+3. Type the reason for the change in the note box.
+4. Click `保存阶段编辑` when you want to persist a structured operator override.
+5. Click `重生成阶段` when that one stage should be recomputed or handed to a
+provider worker again.
+
+The edit action increments the workflow version and creates a
+`cineforge_workflow_edit` task. The regenerate action creates a
+`cineforge_stage_regenerate` task. Both are linked back to the same workflow
+state, so approved shots and accepted media do not need to be thrown away just
+because one stage changed.
+
+Use this for:
+
+- changing the world bible or cliffhanger rule after producer review
+- locking a newly approved costume or prop into the asset pipeline
+- changing image runtime policy from one adapter family to another
+- asking video runtime to preserve approved outputs while refreshing one stage
+- tightening QA/retry policy before batch production
+
+### 12.8 Generate A Closed-Loop Plan
 
 In `Film Core`:
 
@@ -601,7 +673,7 @@ In `Film Core`:
 
 The plan is a preview. It tells you what the system will queue and why.
 
-### 12.8 Create Production Tasks
+### 12.9 Create Production Tasks
 
 In `Film Core`:
 
@@ -622,7 +694,7 @@ These records are written to Jellyfish `generation_tasks` and
 `generation_task_links`. That gives the batch pipeline durable state and makes
 the tasks visible in the existing UI.
 
-### 12.9 Generate Media
+### 12.10 Generate Media
 
 For each ready shot:
 
@@ -636,7 +708,7 @@ The industrial task ledger and the normal video generation tasks share the same
 task-center substrate. This keeps Film Core orchestration separate from
 provider execution.
 
-### 12.10 QA And Retry
+### 12.11 QA And Retry
 
 After videos exist:
 
@@ -653,7 +725,7 @@ Retry repair patches should target specific causes:
 - first/key/last-frame reference reuse
 - camera/action completeness
 
-### 12.11 Final Editing And Export
+### 12.12 Final Editing And Export
 
 When accepted clips exist:
 
@@ -674,7 +746,7 @@ The post-production task created by Film Core records the intended export scope
 and writeback targets, while actual file creation remains with the editor and
 runtime workers.
 
-### 12.12 Multi-Episode Continuity Checklist
+### 12.13 Multi-Episode Continuity Checklist
 
 Before starting the next episode, check:
 

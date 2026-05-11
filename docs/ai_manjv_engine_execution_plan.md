@@ -62,6 +62,7 @@ The report identifies the real moat for a 2-3 person AI manju team as a reusable
 | Phase 10 | Done | `vendor/jellyfish` tracks the real upstream Jellyfish base; `src/film_engine/studio.py` and `src/film_engine/server.py` expose the Studio Dashboard plus status APIs. |
 | Phase 11 | Done | Jellyfish backend exposes `/api/v1/film/industrial/...`; Jellyfish Project Workbench has a native `Film Core` tab for 9/9 implementation evidence, pipeline status, consistency health, QA/retry readiness, and plan preview. |
 | Phase 12 | Done | Jellyfish Film Core now exposes `POST /api/v1/film/industrial/projects/{project_id}/run`; the UI `创建生产任务` action writes render, QA, retry, post-production, or blocker-gate tasks into `generation_tasks` and `generation_task_links`. |
+| Phase 13 | Done | CineForge workflow state is persisted in Jellyfish through `cineforge_workflow_states`; the Film Core tab can load nine stages, save stage edits, and queue stage-specific regeneration tasks. |
 
 ## Where The Nine Phases Are Visible
 
@@ -83,6 +84,8 @@ Novel / Script through Final Editing.
 The same tab now has two operational actions:
 
 ```text
+保存阶段编辑     persist a selected CineForge stage patch and version bump
+重生成阶段       queue targeted stage regeneration without discarding approved state
 生成闭环计划     preview render / QA / retry / post-production contracts
 创建生产任务     write industrial task records into Jellyfish task center
 ```
@@ -101,8 +104,8 @@ The same tab now has two operational actions:
 
 | Priority | Delivery |
 | --- | --- |
-| 1 | Bind provider workers to execute `industrial_video_render`, `industrial_qa`, `industrial_retry_plan`, and `industrial_post_production` records. |
-| 2 | Persist real provider media files, QA reports, retry decisions, and final exports back to Jellyfish file/shot/editor records after worker completion. |
+| 1 | Bind provider workers to execute `industrial_video_render`, `industrial_qa`, `industrial_retry_plan`, `industrial_post_production`, and `cineforge_stage_regenerate` records. |
+| 2 | Persist real provider media files, QA reports, final retry results, and final exports back to Jellyfish file/shot/editor records after worker completion. |
 | 3 | Replace deterministic QA planning metrics with production CV/CLIP/face/outfit/light detectors. |
 
 ## Non-Goals For This Pass

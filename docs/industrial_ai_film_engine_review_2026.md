@@ -156,6 +156,7 @@ industrial intelligence that makes outputs repeatable.
 | Expensive retry chaos | Retry must patch specific prompts and parameters. | `RetryEngine`, repair hints, attempt limits. |
 | No final editing closure | Voice, subtitles, compose, concat, and export must be planned. | `PostProductionPlanner` and FFmpeg step compiler. |
 | No operator UI | Operators need stage, shot, QA, retry, and base status in the same production workspace. | Jellyfish Project Workbench `Film Core` tab plus `/api/v1/film/industrial/...`. |
+| Destructive rework after producer edits | A producer must be able to edit or regenerate one stage without resetting the episode. | `CineForgeWorkflowState`, workflow-state edit/regenerate APIs, task-ledger mutation history. |
 
 ## 6. Architecture From Zero
 
@@ -206,6 +207,7 @@ Key design rules:
 | Final editing | `src/film_engine/post_production.py` |
 | Batch planning | `src/film_engine/batch.py` |
 | Jellyfish-native industrial API | `vendor/jellyfish/backend/app/services/industrial_film_core.py`, `vendor/jellyfish/backend/app/api/v1/routes/film/industrial.py` |
+| CineForge workflow persistence | `vendor/jellyfish/backend/app/models/industrial.py`, workflow-state endpoints, `vendor/jellyfish/backend/tests/test_industrial_workflow_state.py` |
 | Jellyfish-native Film Core UI | `vendor/jellyfish/front/src/pages/aiStudio/project/ProjectWorkbench/tabs/FilmCoreTab.tsx`, `vendor/jellyfish/front/src/services/industrialFilm.ts` |
 
 ## 8. What Is Still Not Claimed Done
@@ -217,16 +219,19 @@ Done in the Jellyfish-native pass:
 
 - exposed a typed industrial Film Core overview endpoint inside Jellyfish
 - exposed a closed-loop production plan preview endpoint inside Jellyfish
+- exposed persisted CineForge workflow state load/edit/regenerate endpoints
 - added a Project Workbench `Film Core` tab instead of a separate UI
 - surfaced pipeline stage evidence, consistency health, QA/retry readiness,
-  pain-point diagnosis, reference project breakdown, and plan preview
+  pain-point diagnosis, reference project breakdown, workflow-stage editing,
+  targeted stage regeneration, and plan preview
 
 Still required for true industrial deployment:
 
 - bind LuminAI planner output back into live Jellyfish DB/API records
 - execute real video renders through production credentials
 - replace demo QA metrics with CV/CLIP/face/outfit/light detectors
-- persist generated media and retry decisions in Jellyfish media/task tables
+- persist generated media and final provider retry results in Jellyfish media
+  and shot tables after workers complete
 - add auth, project permissions, multi-user review, and queue governance
 
 ## 9. Acceptance Criteria For This Pass
@@ -240,6 +245,12 @@ This pass is acceptable when:
 - `/api/jellyfish/base-status` exposes Jellyfish path, commit, commands, and ports.
 - `/api/v1/film/industrial/projects/{project_id}/overview` exposes the full
   Novel/Script to Final Editing industrial pipeline state.
+- `/api/v1/film/industrial/projects/{project_id}/workflow-state` persists and
+  returns the nine-stage CineForge workflow state.
+- `PATCH /workflow-state/{stage_key}` saves stage edits and creates a
+  `cineforge_workflow_edit` task ledger event.
+- `POST /workflow-state/{stage_key}/regenerate` queues a targeted
+  `cineforge_stage_regenerate` task without discarding approved stages.
 - `/api/v1/film/industrial/projects/{project_id}/plan` returns render queue,
   QA policy, retry policy, post-production steps, and blockers.
 - Jellyfish Project Workbench includes a `Film Core` tab and the dashboard links

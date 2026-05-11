@@ -8,6 +8,7 @@
 - ECS-inspired Entity System
 - Graph-driven Workflow Engine
 - State-centric Data Management
+- Persisted CineForge Workflow State Ledger
 - Runtime Abstraction Layer
 - Post-production Runtime Planner
 - Director Consistency Layer
@@ -52,6 +53,13 @@ the Project Workbench `Film Core` tab. The same tab surfaces both the starter-ki
 pipeline, and it can write queueable render/QA/retry/post-production task
 records into Jellyfish `generation_tasks` and `generation_task_links`.
 
+The CineForge workflow ledger persists the nine Prompt-derived stages inside
+Jellyfish with `cineforge_workflow_states`. Operators can edit a single stage,
+increment the workflow version, and queue stage-specific regeneration tasks.
+Those mutation events also reuse `generation_tasks` and `generation_task_links`,
+so edit/regenerate history is recoverable through the existing task center
+instead of a parallel runtime.
+
 ## Key Principles
 
 - Modularity: Each component is independent and reusable
@@ -61,3 +69,5 @@ records into Jellyfish `generation_tasks` and `generation_task_links`.
 - Compilation: Prompts are compiled from structured data
 - Continuity: Character, outfit, lighting, and timeline state are explicit
 - Retryability: QA failures become structured retry decisions
+- Editability: workflow stages can be patched or regenerated without resetting
+  approved project state

@@ -133,14 +133,19 @@ The tab shows both starter-kit `9/9` implementation completion evidence and the
 the operational `创建生产任务` action, which writes render, QA, retry, and
 post-production task records into Jellyfish `generation_tasks` and
 `generation_task_links` so the existing task center can track the industrial
-closed loop.
+closed loop. The same tab now exposes a persisted CineForge workflow state
+ledger: operators can select any workflow stage, save a structured edit, and
+queue targeted regeneration without discarding approved stages.
 
 Industrial Film Core endpoints:
 
 ```text
-GET  http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/overview
-POST http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/plan
-POST http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/run
+GET   http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/overview
+GET   http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/workflow-state
+PATCH http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}
+POST  http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/regenerate
+POST  http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/plan
+POST  http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/run
 ```
 
 For local development, start the Jellyfish backend on `8011`:
