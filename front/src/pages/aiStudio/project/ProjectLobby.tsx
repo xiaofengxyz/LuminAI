@@ -15,6 +15,7 @@ import {
   message,
   Space,
   Tag,
+  Tooltip,
   Popconfirm,
 } from 'antd'
 import {
@@ -547,6 +548,20 @@ const ProjectLobby: React.FC = () => {
 
   const selectedProject = filteredSorted.find((p) => p.id === selectedProjectId) ?? filteredSorted[0]
 
+  /**
+   * 打开项目级 Film Core；空项目工作区会先进入项目创建，避免入口灰掉后无法发现。
+   */
+  const handleOpenFilmCoreEntry = () => {
+    if (selectedProject) {
+      navigate(getProjectFilmCorePath(selectedProject.id))
+      return
+    }
+
+    // 重要状态变化：没有项目时先拉起创建弹窗，创建成功后会进入项目工作台。
+    handleOpenCreate()
+    message.info('先创建项目，随后可在项目工作台查看 Film Core')
+  }
+
   const renderCard = (p: ProjectView) => {
     const status = getProjectStatus(p)
     const stageSummary = projectStageMap[p.id]
@@ -872,15 +887,16 @@ const ProjectLobby: React.FC = () => {
             <Button type="primary" size="small" className="text-[11px]" icon={<PlusOutlined />} onClick={handleOpenCreate}>
               新建项目
             </Button>
-            <Button
-              size="small"
-              className="text-[11px]"
-              icon={<DeploymentUnitOutlined />}
-              disabled={!selectedProject}
-              onClick={() => selectedProject && navigate(getProjectFilmCorePath(selectedProject.id))}
-            >
-              Film Core
-            </Button>
+            <Tooltip title={selectedProject ? '打开当前项目 Film Core Overview' : '选择或创建项目后查看 Film Core'}>
+              <Button
+                size="small"
+                className="text-[11px]"
+                icon={<DeploymentUnitOutlined />}
+                onClick={handleOpenFilmCoreEntry}
+              >
+                Film Core
+              </Button>
+            </Tooltip>
           </Space>
         </div>
       </div>
@@ -893,8 +909,20 @@ const ProjectLobby: React.FC = () => {
             {!loading && filteredSorted.length === 0 && (
               <Col span={24}>
                 <Card>
-                  <div className="text-center text-gray-500 py-8 text-sm">
-                    {search ? '没有匹配的项目' : '暂无项目，点击「新建项目」开始'}
+                  <div className="text-center text-gray-500 py-8 text-sm space-y-3">
+                    <div>{search ? '没有匹配的项目' : '暂无项目，点击「新建项目」开始'}</div>
+                    {!search ? (
+                      <Space size="small" wrap>
+                        <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleOpenCreate}>
+                          新建项目
+                        </Button>
+                        <Tooltip title="Film Core 是项目级 overview；创建项目后自动出现在项目工作台。">
+                          <Button size="small" icon={<DeploymentUnitOutlined />} onClick={handleOpenFilmCoreEntry}>
+                            Film Core
+                          </Button>
+                        </Tooltip>
+                      </Space>
+                    ) : null}
                   </div>
                 </Card>
               </Col>
