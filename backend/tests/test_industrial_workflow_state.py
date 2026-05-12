@@ -17,7 +17,26 @@ from app.api.v1.routes.film.industrial import (
 )
 from app.core.db import Base
 from app.models.industrial import CineForgeWorkflowState
-from app.models.studio import Chapter, Project, ProjectStyle, ProjectVisualStyle, Shot, ShotStatus
+from app.models.studio import (
+    Actor,
+    Chapter,
+    Character,
+    Costume,
+    Project,
+    ProjectActorLink,
+    ProjectCostumeLink,
+    ProjectPropLink,
+    ProjectSceneLink,
+    ProjectStyle,
+    ProjectVisualStyle,
+    Prop,
+    Scene,
+    Shot,
+    ShotCharacterLink,
+    ShotDetail,
+    ShotFrameImage,
+    ShotStatus,
+)
 from app.models.task import GenerationTask
 from app.models.task_links import GenerationTaskLink
 
@@ -207,22 +226,94 @@ async def test_text_to_drama_creates_project_episodes_shots_and_workflow_tasks()
         assert response.data.project.name == "雨夜发光剧本"
         assert len(response.data.chapters) == 2
         assert response.data.created_shot_count == 6
+        assert response.data.created_character_count >= 3
+        assert response.data.created_scene_count >= 2
+        assert response.data.created_prop_count >= 1
+        assert response.data.created_costume_count == response.data.created_character_count
+        assert response.data.reference_harvest_task_count == response.data.created_character_count
+        assert response.data.shooting_gate.ready is True
         assert response.data.workflow.workflow_key == "cineforge_ai_drama_os"
         assert response.data.workflow.stages[1].automation.mode == "automatic"
-        assert [task.task_kind for task in response.data.tasks] == [
-            "cineforge_text_to_drama_intake",
-            "cineforge_text_to_drama_auto_pipeline",
-        ]
+        task_kinds = [task.task_kind for task in response.data.tasks]
+        assert task_kinds[0] == "cineforge_text_to_drama_intake"
+        assert task_kinds[-1] == "cineforge_text_to_drama_auto_pipeline"
+        assert task_kinds.count("cineforge_reference_harvest") == response.data.created_character_count
 
         chapters = (await db.execute(select(Chapter))).scalars().all()
         shots = (await db.execute(select(Shot))).scalars().all()
+        shot_details = (await db.execute(select(ShotDetail))).scalars().all()
+        characters = (await db.execute(select(Character))).scalars().all()
+        actors = (await db.execute(select(Actor))).scalars().all()
+        costumes = (await db.execute(select(Costume))).scalars().all()
+        scenes = (await db.execute(select(Scene))).scalars().all()
+        props = (await db.execute(select(Prop))).scalars().all()
+        shot_character_links = (await db.execute(select(ShotCharacterLink))).scalars().all()
+        frame_images = (await db.execute(select(ShotFrameImage))).scalars().all()
+        project_actor_links = (await db.execute(select(ProjectActorLink))).scalars().all()
+        project_scene_links = (await db.execute(select(ProjectSceneLink))).scalars().all()
+        project_prop_links = (await db.execute(select(ProjectPropLink))).scalars().all()
+        project_costume_links = (await db.execute(select(ProjectCostumeLink))).scalars().all()
         tasks = (await db.execute(select(GenerationTask).order_by(GenerationTask.created_at))).scalars().all()
         assert len(chapters) == 2
+        assert all(chapter.raw_text.startswith(f"第{chapter.index}集") for chapter in chapters)
+        assert all(chapter.condensed_text for chapter in chapters)
         assert len(shots) == 6
-        assert [task.task_kind for task in tasks] == [
-            "cineforge_text_to_drama_intake",
-            "cineforge_text_to_drama_auto_pipeline",
-        ]
+        assert len(shot_details) == 6
+        assert len(characters) == response.data.created_character_count
+        assert len(actors) == len(characters)
+        assert len(costumes) == len(characters)
+        assert len(scenes) == response.data.created_scene_count
+        assert len(props) == response.data.created_prop_count
+        assert len(shot_character_links) >= len(shots)
+        assert len(frame_images) == len(shots) * 3
+        assert len(project_actor_links) >= len(characters)
+        assert len(project_scene_links) >= len(shots)
+        assert len(project_prop_links) >= len(shots)
+        assert len(project_costume_links) >= len(shots)
+        assert tasks[0].task_kind == "cineforge_text_to_drama_intake"
+        assert tasks[-1].task_kind == "cineforge_text_to_drama_auto_pipeline"
+        assert sum(1 for task in tasks if task.task_kind == "cineforge_reference_harvest") == len(characters)
+        workflow_stage = response.data.workflow.stage_data["novel_engine"]
+        assert "generated_novel" in workflow_stage
+        assert response.data.workflow.stage_data["asset_pipeline"]["character_bible"]
+        assert response.data.workflow.stage_data["image_runtime"]["reference_harvest"]["items"]
+    finally:
+        await db.close()
+        await engine.dispose()
+
+
+async def test_text_to_drama_recovers_from_orphan_chapter_scope():
+    db, engine = await _build_session()
+    try:
+        db.add(
+            Chapter(
+                id="orphan-project-ep-01",
+                project_id="orphan-project",
+                index=1,
+                title="stale",
+                raw_text="stale interrupted run",
+                condensed_text="stale",
+            )
+        )
+        await db.flush()
+
+        response = await create_text_to_drama(
+            FilmTextToDramaRequest(
+                project_id="orphan-project",
+                source_text="少年在旧城发现一把会记录未来的钥匙。",
+                project_name="孤儿数据恢复",
+                episode_count=1,
+                shots_per_episode=2,
+            ),
+            db=db,
+        )
+
+        assert response.data is not None
+        assert response.data.project.id == "orphan-project"
+        assert response.data.created_shot_count == 2
+        chapters = (await db.execute(select(Chapter).where(Chapter.project_id == "orphan-project"))).scalars().all()
+        assert len(chapters) == 1
+        assert chapters[0].title.startswith("第1集")
     finally:
         await db.close()
         await engine.dispose()

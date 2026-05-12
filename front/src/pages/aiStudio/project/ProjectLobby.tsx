@@ -404,6 +404,7 @@ const ProjectLobby: React.FC = () => {
       shots_per_episode: 6,
       default_video_ratio: defaultVideoRatio ?? '9:16',
       automation_mode: 'automatic',
+      reference_harvest_enabled: true,
     })
     setTextToDramaModalOpen(true)
   }
@@ -417,6 +418,7 @@ const ProjectLobby: React.FC = () => {
     shots_per_episode: number
     default_video_ratio?: string
     automation_mode: 'automatic' | 'manual'
+    reference_harvest_enabled?: boolean
   }) => {
     setTextToDramaCreating(true)
     try {
@@ -429,8 +431,11 @@ const ProjectLobby: React.FC = () => {
         shots_per_episode: values.shots_per_episode,
         default_video_ratio: values.default_video_ratio || '9:16',
         automation_mode: values.automation_mode,
+        reference_harvest_enabled: values.reference_harvest_enabled ?? true,
       })
-      message.success(`已创建 ${data.chapters.length} 集、${data.created_shot_count} 个镜头种子`)
+      message.success(
+        `已创建 ${data.chapters.length} 集、${data.created_shot_count} 个镜头、${data.created_character_count} 个角色资产`,
+      )
       setTextToDramaModalOpen(false)
       await load()
       navigate(data.next_url)
@@ -942,12 +947,12 @@ const ProjectLobby: React.FC = () => {
             </Space>
 
             <Button type="primary" size="small" className="text-[11px]" icon={<PlusOutlined />} onClick={handleOpenCreate}>
-              新建项目
+              新建空项目
             </Button>
             <Button size="small" className="text-[11px]" icon={<RocketOutlined />} onClick={handleOpenTextToDrama}>
-              文本生成漫剧
+              一键文本生成漫剧
             </Button>
-            <Tooltip title={selectedProject ? '打开当前项目 Film Core Overview' : '选择或创建项目后查看 Film Core'}>
+            <Tooltip title={selectedProject ? 'Film Core 是已有项目的生产控制中心' : '先新建空项目或一键文本生成漫剧，再进入 Film Core'}>
               <Button
                 size="small"
                 className="text-[11px]"
@@ -970,11 +975,11 @@ const ProjectLobby: React.FC = () => {
               <Col span={24}>
                 <Card>
                   <div className="text-center text-gray-500 py-8 text-sm space-y-3">
-                    <div>{search ? '没有匹配的项目' : '暂无项目，点击「新建项目」开始'}</div>
+                    <div>{search ? '没有匹配的项目' : '暂无项目，点击「新建空项目」或「一键文本生成漫剧」开始'}</div>
                     {!search ? (
                       <Space size="small" wrap>
                         <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleOpenCreate}>
-                          新建项目
+                          新建空项目
                         </Button>
                         <Tooltip title="Film Core 是项目级 overview；创建项目后自动出现在项目工作台。">
                           <Button size="small" icon={<DeploymentUnitOutlined />} onClick={handleOpenFilmCoreEntry}>
@@ -982,7 +987,7 @@ const ProjectLobby: React.FC = () => {
                           </Button>
                         </Tooltip>
                         <Button size="small" icon={<RocketOutlined />} onClick={handleOpenTextToDrama}>
-                          文本生成漫剧
+                          一键文本生成漫剧
                         </Button>
                       </Space>
                     ) : null}
@@ -1156,6 +1161,7 @@ const ProjectLobby: React.FC = () => {
             shots_per_episode: 6,
             default_video_ratio: defaultVideoRatio ?? '9:16',
             automation_mode: 'automatic',
+            reference_harvest_enabled: true,
           }}
         >
           <Form.Item name="project_name" label="项目名称（选填）">
@@ -1193,6 +1199,14 @@ const ProjectLobby: React.FC = () => {
                 { label: '人工停等', value: 'manual' },
               ]}
             />
+          </Form.Item>
+          <Form.Item
+            name="reference_harvest_enabled"
+            label="创建角色网络参考采集任务"
+            valuePropName="checked"
+            tooltip="默认只创建候选 URL 与授权线索采集任务，不直接下载或商用外部素材"
+          >
+            <Switch />
           </Form.Item>
           <Form.Item className="mb-0">
             <Space>

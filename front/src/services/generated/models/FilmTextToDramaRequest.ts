@@ -42,6 +42,10 @@ export type FilmTextToDramaRequest = {
      */
     automation_mode?: 'automatic' | 'manual';
     /**
+     * 是否为每个角色创建网络图片/视频参考采集任务；默认只采集候选 URL 与授权线索
+     */
+    reference_harvest_enabled?: boolean;
+    /**
      * 生产计划使用的供应商逻辑名
      */
     provider?: string;

@@ -343,8 +343,12 @@ class IndustrialProjectSnapshot:
 
     @property
     def has_asset_bible(self) -> bool:
-        return self.character_count > 0 and (
-            self.scene_link_count > 0 or self.prop_link_count > 0 or self.costume_link_count > 0
+        return (
+            self.character_count > 0
+            and self.actor_link_count >= self.character_count
+            and self.scene_link_count > 0
+            and self.costume_link_count > 0
+            and self.prop_link_count > 0
         )
 
 
@@ -380,6 +384,8 @@ def build_industrial_overview(snapshot: IndustrialProjectSnapshot) -> dict[str, 
         "qa_retry": qa_retry,
         "pain_points": pain_points,
         "reference_projects": REFERENCE_PROJECTS,
+        "creation_entries": _build_creation_entries(snapshot),
+        "shooting_gate": _build_shooting_gate(snapshot),
         "operator_next_actions": next_actions,
         "implementation_status": build_implementation_status(),
         "implementation_phases": IMPLEMENTATION_PHASES,
@@ -410,6 +416,7 @@ def build_closed_loop_plan(
     """Build a runtime-neutral closed-loop plan preview for one project scope."""
 
     overview = build_industrial_overview(snapshot)
+    shooting_gate = overview["shooting_gate"]
     shot_slots = max(snapshot.shot_count, snapshot.ready_shot_count, snapshot.generated_video_count)
     render_queue = [
         {
@@ -425,6 +432,7 @@ def build_closed_loop_plan(
             },
         }
         for index in range(1, shot_slots + 1)
+        if shooting_gate["ready"]
     ]
     retry_candidates = max(0, snapshot.ready_shot_count - snapshot.generated_video_count)
     return {
@@ -458,7 +466,14 @@ def build_closed_loop_plan(
             "steps": ["tts_alignment", "subtitle_pack", "shot_concat", "bgm_mix", "final_export"],
             "write_back_targets": ["files", "generation_task_links", "shots.generated_video_file_id"],
         },
-        "blockers": [item for item in overview["operator_next_actions"] if item["severity"] == "high"],
+        "blockers": [
+            *[item for item in overview["operator_next_actions"] if item["severity"] == "high"],
+            *[
+                {"severity": "high", "action": blocker}
+                for blocker in shooting_gate["blockers"]
+                if not shooting_gate["ready"]
+            ],
+        ],
     }
 
 
@@ -1184,6 +1199,82 @@ def _build_pain_points(snapshot: IndustrialProjectSnapshot) -> list[dict[str, An
         },
     ]
     return pain_points
+
+
+def _build_creation_entries(snapshot: IndustrialProjectSnapshot) -> list[dict[str, str]]:
+    return [
+        {
+            "key": "blank_project",
+            "title": "新建项目",
+            "purpose": "创建空项目外壳，适合已经有章节、分镜或资产要逐步导入的团队。",
+            "when_to_use": "制片人已有剧本或资产，只需要 Jellyfish 工作台承接生产状态。",
+            "route_hint": "/projects -> 新建项目",
+            "output": "Project 记录；不会自动生成小说、角色或分镜。",
+        },
+        {
+            "key": "text_to_drama",
+            "title": "文本生成漫剧",
+            "purpose": "从一句创意或正文自动扩展小说稿、分集脚本、分镜、资产圣经和参考采集任务。",
+            "when_to_use": "只有创意/梗概，希望从零进入多集 AI 漫剧工业流水线。",
+            "route_hint": "/projects -> 文本生成漫剧",
+            "output": "Project、Chapter、Shot、角色/服装/道具/场景、CineForge 工作流和任务账本。",
+        },
+        {
+            "key": "film_core",
+            "title": "Film Core",
+            "purpose": "项目级控制中心，用来检查门禁、编辑九阶段状态、生成计划并创建生产任务。",
+            "when_to_use": "项目已经存在，需要判断是否能拍、该用什么运行时模型、哪些镜头要 QA/重试。",
+            "route_hint": f"/projects/{snapshot.project_id}?tab=filmCore",
+            "output": "只读/编辑/编排已有项目状态，不负责新建空项目。",
+        },
+    ]
+
+
+def _build_shooting_gate(snapshot: IndustrialProjectSnapshot) -> dict[str, Any]:
+    blockers: list[str] = []
+    if not snapshot.has_script:
+        blockers.append("缺少小说稿或章节剧本文本，不能进入拍摄。")
+    if snapshot.shot_count <= 0:
+        blockers.append("缺少分集脚本和分镜图谱，不能创建镜头级生产任务。")
+    if snapshot.character_count <= 0:
+        blockers.append("缺少角色圣经，无法锁定角色身份。")
+    if snapshot.actor_link_count < max(snapshot.character_count, 1):
+        blockers.append("角色缺少演员形象/身份参考绑定。")
+    if snapshot.scene_link_count <= 0:
+        blockers.append("缺少场景资产绑定，无法保证镜头空间连续性。")
+    if snapshot.costume_link_count <= 0:
+        blockers.append("缺少服装资产绑定，无法保证跨镜头造型连续。")
+    if snapshot.prop_link_count <= 0:
+        blockers.append("缺少关键道具绑定，无法跟踪道具连续性。")
+    if snapshot.detail_count < snapshot.shot_count:
+        blockers.append("部分镜头缺少景别、机位、运镜、动作拍点或视效说明。")
+
+    ready = len(blockers) == 0 and snapshot.ready_shot_count > 0
+    if not ready and snapshot.ready_shot_count <= 0:
+        blockers.append("没有 ready 状态镜头，生产任务会停在 Film Core 门禁。")
+
+    return {
+        "ready": ready,
+        "state": "ready_to_shoot" if ready else "blocked_before_shooting",
+        "message": (
+            "角色、资产、分镜和运行时前置条件已满足，可以创建生产任务。"
+            if ready
+            else "拍摄前置门禁未通过；先补齐小说、分镜、角色/资产和镜头细节。"
+        ),
+        "blockers": blockers,
+        "required_before_shooting": [
+            "小说稿/章节脚本",
+            "每集分镜和动作拍点",
+            "角色圣经与演员形象参考",
+            "服装、道具、场景资产绑定",
+            "图片/视频运行时模型配置",
+            "QA 与 Retry 策略",
+        ],
+        "allowed_runtime_models": [
+            "Image: FLUX / SDXL / StoryDiffusion / ComfyUI",
+            "Video: Seedance / Kling / Veo / Wan2.1 / Sora / Vidu",
+        ],
+    }
 
 
 def _build_next_actions(snapshot: IndustrialProjectSnapshot) -> list[dict[str, str]]:

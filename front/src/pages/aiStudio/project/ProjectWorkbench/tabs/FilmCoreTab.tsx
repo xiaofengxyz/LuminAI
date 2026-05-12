@@ -277,6 +277,10 @@ export function FilmCoreTab() {
 
   const handleRun = async () => {
     if (!projectId) return
+    if (!overview?.shooting_gate.ready) {
+      message.warning('拍摄前置门禁未通过，先补齐角色、资产和镜头细节')
+      return
+    }
     setRunning(true)
     try {
       const data = await createIndustrialRun(projectId, {
@@ -353,7 +357,12 @@ export function FilmCoreTab() {
           <Button type="primary" icon={<PlayCircleOutlined />} onClick={handlePlan} loading={planning}>
             生成闭环计划
           </Button>
-          <Button icon={<ControlOutlined />} onClick={handleRun} loading={running}>
+          <Button
+            icon={<ControlOutlined />}
+            onClick={handleRun}
+            loading={running}
+            disabled={!overview.shooting_gate.ready}
+          >
             创建生产任务
           </Button>
         </Space>
@@ -369,6 +378,53 @@ export function FilmCoreTab() {
       ) : (
         <Alert type="success" showIcon message="项目已具备进入批量生产闭环的基础条件" />
       )}
+
+      <Card
+        title="拍摄前置门禁"
+        size="small"
+        extra={<Tag color={overview.shooting_gate.ready ? 'green' : 'red'}>{overview.shooting_gate.state}</Tag>}
+      >
+        <Alert
+          type={overview.shooting_gate.ready ? 'success' : 'warning'}
+          showIcon
+          message={overview.shooting_gate.message}
+        />
+        {overview.shooting_gate.blockers.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {overview.shooting_gate.blockers.map((item) => (
+              <Tag key={item} color="red">
+                {item}
+              </Tag>
+            ))}
+          </div>
+        ) : null}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {overview.shooting_gate.required_before_shooting.map((item) => (
+            <Tag key={item}>{item}</Tag>
+          ))}
+        </div>
+        <Divider className="!my-3" />
+        <Text type="secondary" className="text-xs">
+          可用运行时：{overview.shooting_gate.allowed_runtime_models.join(' / ')}
+        </Text>
+      </Card>
+
+      <Card title="创建入口职责" size="small">
+        <Row gutter={[12, 12]}>
+          {overview.creation_entries.map((entry) => (
+            <Col xs={24} md={8} key={entry.key}>
+              <div className="h-full rounded border border-gray-100 bg-gray-50 px-3 py-2">
+                <div className="font-medium text-gray-900">{entry.title}</div>
+                <div className="mt-1 text-xs text-gray-600">{entry.purpose}</div>
+                <div className="mt-2 text-xs text-gray-500">{entry.when_to_use}</div>
+                <div className="mt-2 rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600">
+                  {entry.output}
+                </div>
+              </div>
+            </Col>
+          ))}
+        </Row>
+      </Card>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={6}>

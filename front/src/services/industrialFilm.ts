@@ -2,6 +2,7 @@ import { FilmService } from './generated'
 import type {
   FilmAssetHealthRead,
   FilmCompiledPromptContractRead,
+  FilmCreationEntryRead,
   FilmImplementationPhaseRead,
   FilmImplementationStatusRead,
   FilmIndustrialOverviewRead,
@@ -25,6 +26,7 @@ import type {
   FilmQueuedTaskRead,
   FilmReferenceProjectRead,
   FilmRenderQueueItemRead,
+  FilmShootingGateRead,
 } from './generated'
 
 export type FilmProjectBrief = FilmProjectBriefRead
@@ -38,7 +40,9 @@ export type FilmNextAction = FilmNextActionRead
 export type FilmImplementationStatus = FilmImplementationStatusRead
 export type FilmImplementationPhase = FilmImplementationPhaseRead
 export type FilmCompiledPromptContract = FilmCompiledPromptContractRead
+export type FilmCreationEntry = FilmCreationEntryRead
 export type FilmRenderQueueItem = FilmRenderQueueItemRead
+export type FilmShootingGate = FilmShootingGateRead
 export type FilmQueuedTask = FilmQueuedTaskRead
 export type FilmIndustrialOverview = FilmIndustrialOverviewRead
 export type FilmIndustrialPlan = FilmIndustrialPlanRead

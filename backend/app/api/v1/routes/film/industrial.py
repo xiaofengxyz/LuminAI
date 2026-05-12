@@ -6,34 +6,51 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.task_manager import DeliveryMode, SqlAlchemyTaskStore
 from app.dependencies import get_db
 from app.models.studio import (
+    Actor,
+    ActorImage,
+    AssetQualityLevel,
+    AssetViewAngle,
     Chapter,
     Character,
+    CharacterImage,
+    CharacterPropLink,
+    Costume,
+    CostumeImage,
     Project,
     ProjectActorLink,
     ProjectCostumeLink,
     ProjectPropLink,
     ProjectSceneLink,
+    Prop,
+    PropImage,
+    Scene,
+    SceneImage,
     ProjectStyle,
     ProjectVisualStyle,
     Shot,
     ShotCandidateStatus,
+    ShotCandidateType,
+    ShotCharacterLink,
     ShotDetail,
     ShotDialogLine,
     ShotDialogueCandidateStatus,
     ShotExtractedCandidate,
     ShotExtractedDialogueCandidate,
     ShotFrameImage,
+    ShotFrameType,
     ShotStatus,
     CameraAngle,
     CameraMovement,
     CameraShotType,
     ChapterStatus,
+    DialogueLineMode,
+    VFXType,
 )
 from app.models.industrial import CineForgeWorkflowState
 from app.models.task import GenerationTask, GenerationTaskStatus
@@ -52,6 +69,10 @@ from app.services.industrial_film_core import (
     ensure_cineforge_stage,
     mark_cineforge_regeneration_queued,
     patch_cineforge_stage_data,
+)
+from app.services.film.text_to_drama import (
+    TextToDramaBlueprint,
+    build_text_to_drama_blueprint,
 )
 
 router = APIRouter(prefix="/industrial")
@@ -116,6 +137,24 @@ class FilmReferenceProjectRead(BaseModel):
     rule: str
 
 
+class FilmCreationEntryRead(BaseModel):
+    key: str
+    title: str
+    purpose: str
+    when_to_use: str
+    route_hint: str
+    output: str
+
+
+class FilmShootingGateRead(BaseModel):
+    ready: bool
+    state: str
+    message: str
+    blockers: list[str]
+    required_before_shooting: list[str]
+    allowed_runtime_models: list[str]
+
+
 class FilmNextActionRead(BaseModel):
     severity: str
     action: str
@@ -149,6 +188,8 @@ class FilmIndustrialOverviewRead(BaseModel):
     qa_retry: FilmQaRetryRead
     pain_points: list[FilmPainPointRead]
     reference_projects: list[FilmReferenceProjectRead]
+    creation_entries: list[FilmCreationEntryRead]
+    shooting_gate: FilmShootingGateRead
     operator_next_actions: list[FilmNextActionRead]
     implementation_status: FilmImplementationStatusRead
     implementation_phases: list[FilmImplementationPhaseRead]
@@ -326,6 +367,10 @@ class FilmTextToDramaRequest(BaseModel):
         "automatic",
         description="全流程默认开关；automatic 进入自动任务账本，manual 创建后停等人工",
     )
+    reference_harvest_enabled: bool = Field(
+        True,
+        description="是否为每个角色创建网络图片/视频参考采集任务；默认只采集候选 URL 与授权线索",
+    )
     provider: str = Field("project_default_video_provider", description="生产计划使用的供应商逻辑名")
     model: str = Field("project_default_video_model", description="生产计划使用的模型逻辑名")
 
@@ -334,6 +379,12 @@ class FilmTextToDramaRead(BaseModel):
     project: FilmProjectBriefRead
     chapters: list[FilmChapterBriefRead]
     created_shot_count: int
+    created_character_count: int
+    created_scene_count: int
+    created_prop_count: int
+    created_costume_count: int
+    reference_harvest_task_count: int
+    shooting_gate: FilmShootingGateRead
     workflow: FilmWorkflowStateRead
     tasks: list[FilmQueuedTaskRead]
     next_url: str
@@ -373,71 +424,110 @@ async def create_text_to_drama(
     project_id = body.project_id or f"cfproj-{uuid4().hex[:12]}"
     if await db.get(Project, project_id) is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=entity_already_exists("Project"))
+    await _cleanup_stale_text_to_drama_scope(db, project_id)
 
     source_text = body.source_text.strip()
     project_name = (body.project_name or _title_from_source_text(source_text)).strip()
+    blueprint = build_text_to_drama_blueprint(
+        source_text=source_text,
+        project_name=project_name,
+        episode_count=body.episode_count,
+        shots_per_episode=body.shots_per_episode,
+        style=_value(body.style),
+        visual_style=_value(body.visual_style),
+        reference_harvest_enabled=body.reference_harvest_enabled,
+    )
     project = Project(
         id=project_id,
         name=project_name,
-        description=source_text[:240],
+        description=blueprint.series_logline[:240],
         style=body.style,
         visual_style=body.visual_style,
         seed=_stable_seed_from_text(source_text),
         unify_style=True,
-        progress=5,
+        progress=20 if body.automation_mode == "automatic" else 10,
         default_video_ratio=body.default_video_ratio,
         stats={
             "chapters": body.episode_count,
             "shots": body.episode_count * body.shots_per_episode,
+            "roles": len(blueprint.characters),
+            "scenes": len(blueprint.scenes),
+            "props": len(blueprint.props),
+            "costumes": len(blueprint.characters),
             "source": "text_to_drama",
+            "source_pipeline": "text_to_novel_to_assets_to_storyboard",
             "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         },
     )
     db.add(project)
 
-    chunks = _split_source_text(source_text, body.episode_count)
+    asset_ids = _persist_text_to_drama_assets(
+        db,
+        project_id=project_id,
+        project_name=project_name,
+        blueprint=blueprint,
+        style=body.style,
+        visual_style=body.visual_style,
+    )
     created_chapters: list[Chapter] = []
     created_shot_count = 0
-    for episode_index, chunk in enumerate(chunks, start=1):
-        chapter_id = f"{project_id}-ep-{episode_index:02d}"
+    for episode in blueprint.episodes:
+        chapter_id = f"{project_id}-ep-{episode.index:02d}"
         chapter = Chapter(
             id=chapter_id,
             project_id=project_id,
-            index=episode_index,
-            title=f"第{episode_index}集",
-            summary=_summary_from_text(chunk),
-            raw_text=chunk,
-            condensed_text=chunk[:1200],
-            storyboard_count=body.shots_per_episode,
+            index=episode.index,
+            title=episode.title,
+            summary=episode.summary,
+            raw_text=episode.novel_text,
+            condensed_text="\n".join(episode.script_outline),
+            storyboard_count=len(episode.shots),
             status=ChapterStatus.shooting if body.automation_mode == "automatic" else ChapterStatus.draft,
         )
         db.add(chapter)
         created_chapters.append(chapter)
-        for shot_index, excerpt in enumerate(_shot_excerpts(chunk, body.shots_per_episode), start=1):
+        for shot_index, shot_seed in enumerate(episode.shots, start=1):
             shot_id = f"{chapter_id}-s{shot_index:03d}"
             db.add(
                 Shot(
                     id=shot_id,
                     chapter_id=chapter_id,
                     index=shot_index,
-                    title=f"镜头 {shot_index:03d}",
+                    title=shot_seed.title,
                     status=ShotStatus.ready if body.automation_mode == "automatic" else ShotStatus.pending,
-                    script_excerpt=excerpt,
+                    script_excerpt=shot_seed.script_excerpt,
                     skip_extraction=body.automation_mode == "automatic",
+                    last_extracted_at=datetime.now(timezone.utc),
                 )
             )
             db.add(
                 ShotDetail(
                     id=shot_id,
-                    camera_shot=CameraShotType.ms,
-                    angle=CameraAngle.eye_level,
-                    movement=CameraMovement.static,
-                    duration=6,
+                    camera_shot=CameraShotType(shot_seed.camera_shot),
+                    angle=CameraAngle(shot_seed.camera_angle),
+                    movement=CameraMovement(shot_seed.camera_movement),
+                    scene_id=asset_ids["scenes"].get(shot_seed.scene_key),
+                    duration=shot_seed.duration,
                     override_video_ratio=body.default_video_ratio,
-                    mood_tags=["origin_text", "auto_seed"],
-                    atmosphere=_summary_from_text(excerpt),
-                    action_beats=[excerpt],
+                    mood_tags=["generated_novel", "auto_storyboard", "film_core_gate"],
+                    atmosphere=shot_seed.storyboard,
+                    has_bgm=True,
+                    vfx_type=VFXType(shot_seed.vfx_type),
+                    vfx_note=shot_seed.vfx_note,
+                    description=shot_seed.storyboard,
+                    action_beats=[shot_seed.script_excerpt, shot_seed.storyboard],
+                    first_frame_prompt=f"{shot_seed.storyboard}；首帧锁定场景、角色站位和服装。",
+                    key_frame_prompt=f"{shot_seed.storyboard}；关键帧突出动作拍点和{shot_seed.vfx_note}。",
+                    last_frame_prompt=f"{shot_seed.storyboard}；尾帧承接下一镜头连续性。",
                 )
+            )
+            _persist_shot_story_assets(
+                db,
+                project_id=project_id,
+                chapter_id=chapter_id,
+                shot_id=shot_id,
+                shot_seed=shot_seed,
+                asset_ids=asset_ids,
             )
             created_shot_count += 1
 
@@ -452,11 +542,73 @@ async def create_text_to_drama(
                 "source_text_seed": source_text[:2000],
                 "target_episode_count": body.episode_count,
                 "goal": "expand source text into a serialized novel, then into AI drama episodes",
+                "series_logline": blueprint.series_logline,
+                "generated_novel": blueprint.generated_novel_text[:6000],
+                "world_bible": blueprint.world_bible,
+                "relationship_graph": blueprint.relationship_graph,
+                "episodes": [
+                    {
+                        "index": episode.index,
+                        "title": episode.title,
+                        "summary": episode.summary,
+                        "script_outline": episode.script_outline,
+                        "cliffhanger": episode.cliffhanger,
+                    }
+                    for episode in blueprint.episodes
+                ],
+            },
+            "asset_pipeline": {
+                "character_bible": [
+                    {
+                        "key": item.key,
+                        "name": item.name,
+                        "description": item.description,
+                        "costume": item.costume,
+                        "traits": item.traits,
+                    }
+                    for item in blueprint.characters
+                ],
+                "scene_bible": [item.__dict__ for item in blueprint.scenes],
+                "prop_bible": [item.__dict__ for item in blueprint.props],
+                "vfx_notes": blueprint.vfx_notes,
+                "storyboard": [
+                    {
+                        "episode": episode.index,
+                        "shots": [
+                            {
+                                "key": shot.key,
+                                "title": shot.title,
+                                "storyboard": shot.storyboard,
+                                "characters": shot.character_keys,
+                                "props": shot.prop_keys,
+                                "vfx": shot.vfx_note,
+                            }
+                            for shot in episode.shots
+                        ],
+                    }
+                    for episode in blueprint.episodes
+                ],
+            },
+            "image_runtime": {
+                "reference_harvest": blueprint.reference_harvest,
+                "reference_policy": ["web metadata candidates", "identity lock", "costume lock", "scene keyframe"],
+            },
+            "video_runtime": {
+                "shooting_gate": build_industrial_overview(snapshot)["shooting_gate"],
+                "provider": body.provider,
+                "model": body.model,
             },
             "final_integration": {
                 "user_goal": "输入一段文字 -> 自动生成小说 -> 自动生成多集 AI 漫剧",
                 "default_provider": body.provider,
                 "default_model": body.model,
+                "created_assets": {
+                    "characters": len(blueprint.characters),
+                    "scenes": len(blueprint.scenes),
+                    "props": len(blueprint.props),
+                    "costumes": len(blueprint.characters),
+                    "shots": created_shot_count,
+                },
             },
         },
         automation_patch=automation_patch,
@@ -480,6 +632,15 @@ async def create_text_to_drama(
         purpose="create project, episodes, shot graph seeds, and CineForge workflow from user text",
     )
     tasks = [intake_task]
+    if body.reference_harvest_enabled:
+        tasks.extend(
+            await _record_reference_harvest_tasks(
+                db,
+                workflow_id=row.id,
+                project_id=project_id,
+                reference_harvest=blueprint.reference_harvest,
+            )
+        )
     if body.automation_mode == "automatic":
         tasks.append(
             await _record_workflow_task(
@@ -529,14 +690,24 @@ async def create_text_to_drama(
                 for c in created_chapters
             ],
             "created_shot_count": created_shot_count,
+            "created_character_count": len(blueprint.characters),
+            "created_scene_count": len(blueprint.scenes),
+            "created_prop_count": len(blueprint.props),
+            "created_costume_count": len(blueprint.characters),
+            "reference_harvest_task_count": sum(
+                1 for task in tasks if task["task_kind"] == "cineforge_reference_harvest"
+            ),
+            "shooting_gate": build_industrial_overview(snapshot)["shooting_gate"],
             "workflow": _workflow_state_payload(snapshot, row),
             "tasks": tasks,
             "next_url": f"/projects/{project_id}?tab=filmCore",
             "usage": {
                 "source_text_chars": len(source_text),
+                "generated_novel_chars": len(blueprint.generated_novel_text),
                 "episode_count": body.episode_count,
                 "shots_per_episode": body.shots_per_episode,
                 "automation_mode": body.automation_mode,
+                "reference_harvest_enabled": body.reference_harvest_enabled,
             },
         }
     )
@@ -1245,6 +1416,313 @@ def _queued_task(
         "progress": progress,
         "purpose": purpose,
     }
+
+
+async def _cleanup_stale_text_to_drama_scope(db: AsyncSession, project_id: str) -> None:
+    """Remove orphan rows left by interrupted local text-to-drama creation."""
+
+    chapter_rows = await db.execute(select(Chapter.id).where(Chapter.project_id == project_id))
+    chapter_ids = [str(item) for item in chapter_rows.scalars().all()]
+    shot_ids: list[str] = []
+    if chapter_ids:
+        shot_rows = await db.execute(select(Shot.id).where(Shot.chapter_id.in_(chapter_ids)))
+        shot_ids = [str(item) for item in shot_rows.scalars().all()]
+
+    character_rows = await db.execute(select(Character.id).where(Character.project_id == project_id))
+    character_ids = [str(item) for item in character_rows.scalars().all()]
+    scoped_prefix = f"{project_id[:42]}-%"
+
+    if shot_ids:
+        await db.execute(delete(ShotDialogLine).where(ShotDialogLine.shot_detail_id.in_(shot_ids)))
+        await db.execute(delete(ShotFrameImage).where(ShotFrameImage.shot_detail_id.in_(shot_ids)))
+        await db.execute(delete(ShotExtractedCandidate).where(ShotExtractedCandidate.shot_id.in_(shot_ids)))
+        await db.execute(delete(ShotExtractedDialogueCandidate).where(ShotExtractedDialogueCandidate.shot_id.in_(shot_ids)))
+        await db.execute(delete(ShotCharacterLink).where(ShotCharacterLink.shot_id.in_(shot_ids)))
+        await db.execute(delete(ShotDetail).where(ShotDetail.id.in_(shot_ids)))
+        await db.execute(delete(Shot).where(Shot.id.in_(shot_ids)))
+        await db.execute(delete(GenerationTaskLink).where(GenerationTaskLink.relation_entity_id.in_(shot_ids)))
+
+    if character_ids:
+        await db.execute(delete(CharacterPropLink).where(CharacterPropLink.character_id.in_(character_ids)))
+        await db.execute(delete(CharacterImage).where(CharacterImage.character_id.in_(character_ids)))
+
+    await db.execute(delete(ProjectActorLink).where(ProjectActorLink.project_id == project_id))
+    await db.execute(delete(ProjectSceneLink).where(ProjectSceneLink.project_id == project_id))
+    await db.execute(delete(ProjectPropLink).where(ProjectPropLink.project_id == project_id))
+    await db.execute(delete(ProjectCostumeLink).where(ProjectCostumeLink.project_id == project_id))
+    await db.execute(delete(Character).where(Character.project_id == project_id))
+    await db.execute(delete(Chapter).where(Chapter.project_id == project_id))
+    await db.execute(delete(CineForgeWorkflowState).where(CineForgeWorkflowState.project_id == project_id))
+
+    # Asset tables have global names, so stale scoped assets must be removed too.
+    actor_rows = await db.execute(select(Actor.id).where(Actor.id.like(scoped_prefix)))
+    actor_ids = [str(item) for item in actor_rows.scalars().all()]
+    costume_rows = await db.execute(select(Costume.id).where(Costume.id.like(scoped_prefix)))
+    costume_ids = [str(item) for item in costume_rows.scalars().all()]
+    scene_rows = await db.execute(select(Scene.id).where(Scene.id.like(scoped_prefix)))
+    scene_ids = [str(item) for item in scene_rows.scalars().all()]
+    prop_rows = await db.execute(select(Prop.id).where(Prop.id.like(scoped_prefix)))
+    prop_ids = [str(item) for item in prop_rows.scalars().all()]
+
+    if actor_ids:
+        await db.execute(delete(ActorImage).where(ActorImage.actor_id.in_(actor_ids)))
+        await db.execute(delete(Actor).where(Actor.id.in_(actor_ids)))
+    if costume_ids:
+        await db.execute(delete(CostumeImage).where(CostumeImage.costume_id.in_(costume_ids)))
+        await db.execute(delete(Costume).where(Costume.id.in_(costume_ids)))
+    if scene_ids:
+        await db.execute(delete(SceneImage).where(SceneImage.scene_id.in_(scene_ids)))
+        await db.execute(delete(Scene).where(Scene.id.in_(scene_ids)))
+    if prop_ids:
+        await db.execute(delete(PropImage).where(PropImage.prop_id.in_(prop_ids)))
+        await db.execute(delete(Prop).where(Prop.id.in_(prop_ids)))
+
+
+def _persist_text_to_drama_assets(
+    db: AsyncSession,
+    *,
+    project_id: str,
+    project_name: str,
+    blueprint: TextToDramaBlueprint,
+    style: ProjectStyle,
+    visual_style: ProjectVisualStyle,
+) -> dict[str, dict[str, str]]:
+    """Persist the generated asset bible before any shot can enter production."""
+
+    ids: dict[str, dict[str, str]] = {
+        "characters": {},
+        "actors": {},
+        "costumes": {},
+        "scenes": {},
+        "props": {},
+    }
+
+    for index, scene_seed in enumerate(blueprint.scenes, start=1):
+        scene_id = _scoped_id(project_id, "scene", index)
+        ids["scenes"][scene_seed.key] = scene_id
+        db.add(
+            Scene(
+                id=scene_id,
+                name=_scoped_name(project_name, scene_seed.name, project_id),
+                description=scene_seed.description,
+                style=style,
+                visual_style=visual_style,
+                view_count=2,
+                tags=["text_to_drama", "scene_bible"],
+            )
+        )
+        db.add(ProjectSceneLink(project_id=project_id, chapter_id=None, shot_id=None, scene_id=scene_id))
+        db.add(SceneImage(scene_id=scene_id, quality_level=AssetQualityLevel.low, view_angle=AssetViewAngle.front))
+
+    for index, prop_seed in enumerate(blueprint.props, start=1):
+        prop_id = _scoped_id(project_id, "prop", index)
+        ids["props"][prop_seed.key] = prop_id
+        db.add(
+            Prop(
+                id=prop_id,
+                name=_scoped_name(project_name, prop_seed.name, project_id),
+                description=prop_seed.description,
+                style=style,
+                visual_style=visual_style,
+                view_count=2,
+                tags=["text_to_drama", "prop_bible"],
+            )
+        )
+        db.add(ProjectPropLink(project_id=project_id, chapter_id=None, shot_id=None, prop_id=prop_id))
+        db.add(PropImage(prop_id=prop_id, quality_level=AssetQualityLevel.low, view_angle=AssetViewAngle.front))
+
+    for index, character_seed in enumerate(blueprint.characters, start=1):
+        actor_id = _scoped_id(project_id, "actor", index)
+        costume_id = _scoped_id(project_id, "costume", index)
+        character_id = _scoped_id(project_id, "char", index)
+        ids["actors"][character_seed.key] = actor_id
+        ids["costumes"][character_seed.key] = costume_id
+        ids["characters"][character_seed.key] = character_id
+        db.add(
+            Actor(
+                id=actor_id,
+                name=_scoped_name(project_name, f"{character_seed.name}形象", project_id),
+                description=character_seed.description,
+                style=style,
+                visual_style=visual_style,
+                view_count=4,
+                tags=["text_to_drama", "identity_lock", *character_seed.traits],
+            )
+        )
+        db.add(
+            Costume(
+                id=costume_id,
+                name=_scoped_name(project_name, f"{character_seed.name}基准服装", project_id),
+                description=character_seed.costume,
+                style=style,
+                visual_style=visual_style,
+                view_count=2,
+                tags=["text_to_drama", "costume_lock"],
+            )
+        )
+        db.add(
+            Character(
+                id=character_id,
+                project_id=project_id,
+                name=character_seed.name,
+                description=f"{character_seed.description}\n服装锁定：{character_seed.costume}",
+                style=style,
+                visual_style=visual_style,
+                actor_id=actor_id,
+                costume_id=costume_id,
+            )
+        )
+        db.add(ProjectActorLink(project_id=project_id, chapter_id=None, shot_id=None, actor_id=actor_id))
+        db.add(ProjectCostumeLink(project_id=project_id, chapter_id=None, shot_id=None, costume_id=costume_id))
+        db.add(ActorImage(actor_id=actor_id, quality_level=AssetQualityLevel.low, view_angle=AssetViewAngle.front))
+        db.add(
+            CharacterImage(
+                character_id=character_id,
+                quality_level=AssetQualityLevel.low,
+                view_angle=AssetViewAngle.front,
+                is_primary=True,
+            )
+        )
+        db.add(CostumeImage(costume_id=costume_id, quality_level=AssetQualityLevel.low, view_angle=AssetViewAngle.front))
+
+    for prop_index, prop_seed in enumerate(blueprint.props):
+        owner_key = prop_seed.owner_character_key or (blueprint.characters[0].key if blueprint.characters else "")
+        owner_id = ids["characters"].get(owner_key)
+        prop_id = ids["props"].get(prop_seed.key)
+        if owner_id and prop_id:
+            db.add(
+                CharacterPropLink(
+                    character_id=owner_id,
+                    prop_id=prop_id,
+                    index=prop_index,
+                    note="text-to-drama auto asset bible",
+                )
+            )
+
+    return ids
+
+
+def _persist_shot_story_assets(
+    db: AsyncSession,
+    *,
+    project_id: str,
+    chapter_id: str,
+    shot_id: str,
+    shot_seed: Any,
+    asset_ids: dict[str, dict[str, str]],
+) -> None:
+    """Attach generated storyboard assets to a shot so shooting has hard prerequisites."""
+
+    scene_id = asset_ids["scenes"].get(shot_seed.scene_key)
+    if scene_id:
+        db.add(ProjectSceneLink(project_id=project_id, chapter_id=chapter_id, shot_id=shot_id, scene_id=scene_id))
+        db.add(
+            ShotExtractedCandidate(
+                shot_id=shot_id,
+                candidate_type=ShotCandidateType.scene,
+                candidate_name=shot_seed.scene_key,
+                candidate_status=ShotCandidateStatus.linked,
+                linked_entity_id=scene_id,
+                source="text_to_drama",
+            )
+        )
+
+    for index, character_key in enumerate(shot_seed.character_keys):
+        character_id = asset_ids["characters"].get(character_key)
+        actor_id = asset_ids["actors"].get(character_key)
+        costume_id = asset_ids["costumes"].get(character_key)
+        if character_id:
+            db.add(ShotCharacterLink(shot_id=shot_id, character_id=character_id, index=index, note="auto storyboard cast"))
+            db.add(
+                ShotExtractedCandidate(
+                    shot_id=shot_id,
+                    candidate_type=ShotCandidateType.character,
+                    candidate_name=character_key,
+                    candidate_status=ShotCandidateStatus.linked,
+                    linked_entity_id=character_id,
+                    source="text_to_drama",
+                )
+            )
+        if actor_id:
+            db.add(ProjectActorLink(project_id=project_id, chapter_id=chapter_id, shot_id=shot_id, actor_id=actor_id))
+        if costume_id:
+            db.add(ProjectCostumeLink(project_id=project_id, chapter_id=chapter_id, shot_id=shot_id, costume_id=costume_id))
+
+    for prop_key in shot_seed.prop_keys:
+        prop_id = asset_ids["props"].get(prop_key)
+        if not prop_id:
+            continue
+        db.add(ProjectPropLink(project_id=project_id, chapter_id=chapter_id, shot_id=shot_id, prop_id=prop_id))
+        db.add(
+            ShotExtractedCandidate(
+                shot_id=shot_id,
+                candidate_type=ShotCandidateType.prop,
+                candidate_name=prop_key,
+                candidate_status=ShotCandidateStatus.linked,
+                linked_entity_id=prop_id,
+                source="text_to_drama",
+            )
+        )
+
+    for frame_type in (ShotFrameType.first, ShotFrameType.key, ShotFrameType.last):
+        db.add(ShotFrameImage(shot_detail_id=shot_id, frame_type=frame_type, format="png"))
+
+    for line_index, line in enumerate(shot_seed.dialogue):
+        speaker_key = line.get("speaker_key")
+        db.add(
+            ShotDialogLine(
+                shot_detail_id=shot_id,
+                index=line_index,
+                text=line.get("text") or "",
+                line_mode=DialogueLineMode.dialogue,
+                speaker_character_id=asset_ids["characters"].get(speaker_key or ""),
+                speaker_name=line.get("speaker_name"),
+            )
+        )
+
+
+async def _record_reference_harvest_tasks(
+    db: AsyncSession,
+    *,
+    workflow_id: str,
+    project_id: str,
+    reference_harvest: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Queue per-character web reference harvesting without downloading media blindly."""
+
+    items = reference_harvest.get("items") if isinstance(reference_harvest, dict) else []
+    if not isinstance(items, list):
+        return []
+
+    tasks: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        tasks.append(
+            await _record_workflow_task(
+                db,
+                workflow_id=workflow_id,
+                task_kind="cineforge_reference_harvest",
+                payload={
+                    "project_id": project_id,
+                    "workflow_id": workflow_id,
+                    "stage": "asset_pipeline.reference_harvest",
+                    "policy": reference_harvest.get("policy"),
+                    **item,
+                },
+                terminal=False,
+                purpose="collect candidate web image/video references and licensing metadata for one character",
+            )
+        )
+    return tasks
+
+
+def _scoped_id(project_id: str, prefix: str, index: int) -> str:
+    return f"{project_id[:42]}-{prefix}-{index:03d}"[:64]
+
+
+def _scoped_name(project_name: str, name: str, project_id: str) -> str:
+    return f"{project_name} · {name} · {project_id[-6:]}"[:255]
 
 
 def _title_from_source_text(source_text: str) -> str:

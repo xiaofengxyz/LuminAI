@@ -4,6 +4,7 @@
 /* eslint-disable */
 import type { FilmAssetHealthRead } from './FilmAssetHealthRead';
 import type { FilmChapterBriefRead } from './FilmChapterBriefRead';
+import type { FilmCreationEntryRead } from './FilmCreationEntryRead';
 import type { FilmImplementationPhaseRead } from './FilmImplementationPhaseRead';
 import type { FilmImplementationStatusRead } from './FilmImplementationStatusRead';
 import type { FilmNextActionRead } from './FilmNextActionRead';
@@ -12,6 +13,7 @@ import type { FilmPipelineStageRead } from './FilmPipelineStageRead';
 import type { FilmProjectBriefRead } from './FilmProjectBriefRead';
 import type { FilmQaRetryRead } from './FilmQaRetryRead';
 import type { FilmReferenceProjectRead } from './FilmReferenceProjectRead';
+import type { FilmShootingGateRead } from './FilmShootingGateRead';
 export type FilmIndustrialOverviewRead = {
     workflow_mode: string;
     project: FilmProjectBriefRead;
@@ -22,6 +24,8 @@ export type FilmIndustrialOverviewRead = {
     qa_retry: FilmQaRetryRead;
     pain_points: Array<FilmPainPointRead>;
     reference_projects: Array<FilmReferenceProjectRead>;
+    creation_entries: Array<FilmCreationEntryRead>;
+    shooting_gate: FilmShootingGateRead;
     operator_next_actions: Array<FilmNextActionRead>;
     implementation_status: FilmImplementationStatusRead;
     implementation_phases: Array<FilmImplementationPhaseRead>;
