@@ -30,12 +30,22 @@ def test_frontend_runtime_config_defaults_to_jellyfish_backend_8011() -> None:
     env_js = (FRONT_DIR / "public" / "env.js").read_text(encoding="utf-8")
     package_json = json.loads((FRONT_DIR / "package.json").read_text(encoding="utf-8"))
 
-    assert "DEFAULT_BACKEND_URL = 'http://localhost:8011'" in runtime_config
+    assert "DEFAULT_BACKEND_URL = 'http://127.0.0.1:8011'" in runtime_config
     assert "getBackendBaseUrl" in openapi_config
     assert "getApiBaseUrl" in http_config
-    assert "http://localhost:8011" in env_js
+    assert "http://127.0.0.1:8011" in env_js
     assert "http://127.0.0.1:8011" in package_json["scripts"]["openapi:fetch"]
+    assert "NO_PROXY=localhost,127.0.0.1,::1" in package_json["scripts"]["openapi:fetch"]
     assert package_json["scripts"]["dev:film-core"] == "vite --host 0.0.0.0 --port 7790"
+
+
+def test_jellyfish_film_core_start_script_bypasses_local_proxy() -> None:
+    script_source = (REPO_ROOT / "scripts" / "start_jellyfish_film_core.sh").read_text(encoding="utf-8")
+
+    assert "NO_PROXY" in script_source
+    assert "curl --noproxy" in script_source
+    assert "BACKEND_PORT=\"${BACKEND_PORT:-8011}\"" in script_source
+    assert "FRONT_PORT=\"${FRONT_PORT:-7790}\"" in script_source
 
 
 def test_project_lobby_keeps_film_core_discoverable_without_projects() -> None:
@@ -44,6 +54,8 @@ def test_project_lobby_keeps_film_core_discoverable_without_projects() -> None:
     )
 
     assert "handleOpenFilmCoreEntry" in lobby_source
+    assert "handleOpenTextToDrama" in lobby_source
+    assert "文本生成漫剧" in lobby_source
     assert "选择或创建项目后查看 Film Core" in lobby_source
     assert "Film Core 是项目级 overview" in lobby_source
     assert "disabled={!selectedProject}" not in lobby_source

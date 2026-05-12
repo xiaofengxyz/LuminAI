@@ -152,11 +152,14 @@ industrial intelligence that makes outputs repeatable.
 | Shot discontinuity | Shots must be graph nodes with ordered timeline state. | `WorkflowGraph`, `ShotContinuityState`, Jellyfish bridge workflow. |
 | Prompt randomness | Prompts must be compiled from state, not hand-written per shot. | `PromptCompiler` from director DSL plus Film State. |
 | Runtime lock-in | Providers must execute render intent, not own story logic. | `RenderRequest`, provider registry, Wan/Kling/Vidu adapters. |
+| Endpoint/key sprawl across model vendors | Producers need to swap model gateways without rewriting film logic. | Jellyfish Provider/Model records store base URLs and keys; runtime-config resolves provider/category adapters without returning secrets. |
 | Manual QA | Production cannot rely on human review for every retry. | `RuleBasedQAEngine`, structured QA issues, retry decisions. |
 | Expensive retry chaos | Retry must patch specific prompts and parameters. | `RetryEngine`, repair hints, attempt limits. |
 | No final editing closure | Voice, subtitles, compose, concat, and export must be planned. | `PostProductionPlanner` and FFmpeg step compiler. |
 | No operator UI | Operators need stage, shot, QA, retry, and base status in the same production workspace. | Jellyfish Project Workbench `Film Core` tab plus `/api/v1/film/industrial/...`. |
 | Destructive rework after producer edits | A producer must be able to edit or regenerate one stage without resetting the episode. | `CineForgeWorkflowState`, workflow-state edit/regenerate APIs, task-ledger mutation history. |
+| One prompt cannot become a durable series | Source text must become project, episode, shot, workflow, and task state. | `text-to-drama` intake creates Jellyfish project/chapters/shots plus CineForge workflow and task ledger. |
+| Automation without control is risky | Some stages should run through, others should wait for producer approval. | Per-stage `execution_mode` switches auto-advance or halt with `waiting_operator`. |
 
 ## 6. Architecture From Zero
 
@@ -209,6 +212,8 @@ Key design rules:
 | Jellyfish-native industrial API | `vendor/jellyfish/backend/app/services/industrial_film_core.py`, `vendor/jellyfish/backend/app/api/v1/routes/film/industrial.py` |
 | CineForge workflow persistence | `vendor/jellyfish/backend/app/models/industrial.py`, workflow-state endpoints, `vendor/jellyfish/backend/tests/test_industrial_workflow_state.py` |
 | Jellyfish-native Film Core UI | `vendor/jellyfish/front/src/pages/aiStudio/project/ProjectWorkbench/tabs/FilmCoreTab.tsx`, `vendor/jellyfish/front/src/services/industrialFilm.ts` |
+| Text-to-drama intake | `POST /api/v1/film/industrial/text-to-drama`, `ProjectLobby.tsx` `文本生成漫剧` modal |
+| Runtime adapter config | Jellyfish `Provider`/`Model` records, `/api/v1/llm/models/{model_id}/runtime-config`, provider registry bootstrap |
 
 ## 8. What Is Still Not Claimed Done
 
@@ -247,12 +252,18 @@ This pass is acceptable when:
   Novel/Script to Final Editing industrial pipeline state.
 - `/api/v1/film/industrial/projects/{project_id}/workflow-state` persists and
   returns the nine-stage CineForge workflow state.
+- `/api/v1/film/industrial/text-to-drama` creates project, episode/chapter,
+  shot-seed, workflow, and task-ledger state from one source text.
 - `PATCH /workflow-state/{stage_key}` saves stage edits and creates a
   `cineforge_workflow_edit` task ledger event.
 - `POST /workflow-state/{stage_key}/regenerate` queues a targeted
   `cineforge_stage_regenerate` task without discarding approved stages.
+- `POST /workflow-state/{stage_key}/complete` applies automatic/manual stage
+  gates and records either auto-advance or `waiting_operator`.
 - `/api/v1/film/industrial/projects/{project_id}/plan` returns render queue,
   QA policy, retry policy, post-production steps, and blockers.
+- `/api/v1/llm/models/{model_id}/runtime-config` resolves provider/model
+  runtime adapter state without exposing secret values.
 - Jellyfish Project Workbench includes a `Film Core` tab and the dashboard links
   into it.
 - tests cover the UI route, status APIs, Jellyfish base inspection, and stage

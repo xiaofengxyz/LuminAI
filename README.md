@@ -105,13 +105,14 @@ Expected Jellyfish URLs:
 Frontend: http://localhost:7788
 Backend:  http://localhost:8000  (Docker Compose)
 Docs:     http://localhost:8000/docs
-Backend:  http://localhost:8011  (local dev / Film Core default)
-Docs:     http://localhost:8011/docs
+Backend:  http://127.0.0.1:8011  (local dev / Film Core default)
+Docs:     http://127.0.0.1:8011/docs
 ```
 
-The checked-in frontend runtime config defaults to `http://localhost:8011` for
-local development so an unrelated service on port 8000 cannot shadow the
-Jellyfish Film Core API. Docker deployments can still override `BACKEND_URL`.
+The checked-in frontend runtime config defaults to `http://127.0.0.1:8011`
+for local development so an unrelated service or proxy on port 8000 cannot
+shadow the Jellyfish Film Core API. Docker deployments can still override
+`BACKEND_URL`.
 
 ## Development Direction
 
@@ -135,24 +136,35 @@ post-production task records into Jellyfish `generation_tasks` and
 `generation_task_links` so the existing task center can track the industrial
 closed loop. The same tab now exposes a persisted CineForge workflow state
 ledger: operators can select any workflow stage, save a structured edit, and
-queue targeted regeneration without discarding approved stages.
+queue targeted regeneration without discarding approved stages. Each of the
+nine Prompt-derived modules also has an automatic/manual switch: automatic
+completion activates the next stage, while manual completion records a
+`waiting_operator` gate.
 
 Industrial Film Core endpoints:
 
 ```text
+POST  http://127.0.0.1:8011/api/v1/film/industrial/text-to-drama
 GET   http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/overview
 GET   http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/workflow-state
 PATCH http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}
 POST  http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/regenerate
+POST  http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/complete
 POST  http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/plan
 POST  http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/run
 ```
 
-For local development, start the Jellyfish backend on `8011`:
+For local development, the easiest path is the no-proxy helper:
+
+```bash
+scripts/start_jellyfish_film_core.sh
+```
+
+Or start the Jellyfish backend on `8011` manually:
 
 ```bash
 cd vendor/jellyfish/backend
-NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 \
+NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1 \
 .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8011
 ```
 

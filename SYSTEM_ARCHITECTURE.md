@@ -9,6 +9,7 @@
 - Graph-driven Workflow Engine
 - State-centric Data Management
 - Persisted CineForge Workflow State Ledger
+- Text-To-Drama Intake Ledger
 - Runtime Abstraction Layer
 - Post-production Runtime Planner
 - Director Consistency Layer
@@ -19,7 +20,7 @@
 
 ## Data Flow
 
-Novel/Script → Jellyfish Project/Chapter/Shot Workspace → LuminAI Platform Bridge → Story Graph → Director Planner → Film Core → Prompt Compiler → Runtime Adapter → Render Runtime → Video Models → QA Engine → Retry Engine → Final Editing
+Source Text → Text-To-Drama Intake → Novel/Script → Jellyfish Project/Chapter/Shot Workspace → LuminAI Platform Bridge → Story Graph → Director Planner → Film Core → Prompt Compiler → Runtime Adapter → Render Runtime → Video Models → QA Engine → Retry Engine → Final Editing
 
 ## Implemented Foundation
 
@@ -60,6 +61,22 @@ Those mutation events also reuse `generation_tasks` and `generation_task_links`,
 so edit/regenerate history is recoverable through the existing task center
 instead of a parallel runtime.
 
+Each CineForge stage now carries an explicit `execution_mode` switch. In
+`automatic` mode, completing a stage records the output and activates the next
+stage. In `manual` mode, completion records `waiting_operator` so a producer can
+review, edit, or regenerate before the graph advances. The
+`/api/v1/film/industrial/text-to-drama` endpoint creates a Jellyfish project,
+episodes-as-chapters, shot seeds, workflow state, and task-ledger entries from
+one source text input, which is the project-level entry point for
+text-to-novel-to-AI-drama production.
+
+Model execution stays behind the Jellyfish provider/model adapter boundary:
+providers store `base_url`, optional image/video base URL overrides, and
+`api_key`/`api_secret`; runtime config APIs expose only the resolved adapter,
+base URL, and key-present flags. Built-in registry keys include OpenAI,
+Volcengine, ComfyUI, FLUX, SDXL, StoryDiffusion, Kling, Seedance, Veo, Wan2.1,
+Sora, and Vidu, while concrete workers remain replaceable modules.
+
 ## Key Principles
 
 - Modularity: Each component is independent and reusable
@@ -71,3 +88,5 @@ instead of a parallel runtime.
 - Retryability: QA failures become structured retry decisions
 - Editability: workflow stages can be patched or regenerated without resetting
   approved project state
+- Controllability: automatic stages advance through the graph, while manual
+  stages halt with recoverable `waiting_operator` state

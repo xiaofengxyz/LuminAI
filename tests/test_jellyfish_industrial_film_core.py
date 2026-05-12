@@ -15,6 +15,8 @@ from app.services.industrial_film_core import (  # noqa: E402
     build_closed_loop_plan,
     build_industrial_overview,
     build_writeback_summary,
+    complete_cineforge_stage,
+    patch_cineforge_stage_data,
 )
 
 
@@ -167,6 +169,54 @@ def test_cineforge_workflow_state_exposes_persisted_editable_stage_contracts():
     assert state["stage_data"]["video_runtime"]["adapters"] == ["seedance", "kling", "veo", "wan2.1", "sora"]
     assert state["edit_contract"]["method"] == "PATCH"
     assert state["regenerate_contract"]["method"] == "POST"
+    assert state["automation_contract"]["mode_values"] == ["automatic", "manual"]
+    assert state["stages"][0]["automation"]["mode"] == "automatic"
+    assert state["stages"][6]["automation"]["mode"] == "manual"
+
+
+def test_cineforge_workflow_stage_switch_controls_auto_advance_or_manual_halt():
+    stage_data, stage_status, edit_event = patch_cineforge_stage_data(
+        current_stage_data={},
+        current_stage_status={},
+        stage_key="novel_engine",
+        patch={"operator_note": "review before assets"},
+        actor="tester",
+        note="set manual gate",
+        next_version=2,
+        execution_mode="manual",
+        auto_advance=False,
+    )
+
+    assert edit_event["automation"]["mode"] == "manual"
+    assert stage_data["novel_engine"]["automation"]["stop_after_stage"] is True
+
+    completed_data, completed_status, complete_event = complete_cineforge_stage(
+        current_stage_data=stage_data,
+        current_stage_status=stage_status,
+        stage_key="novel_engine",
+        task_id="task-manual",
+        actor="tester",
+        result={"summary": "novel outline approved"},
+        next_version=3,
+    )
+    assert completed_data["novel_engine"]["last_result"]["summary"] == "novel outline approved"
+    assert completed_status["novel_engine"]["state"] == "waiting_operator"
+    assert complete_event["next_stage_state"] == "operator_halt"
+
+    auto_data, auto_status, auto_event = complete_cineforge_stage(
+        current_stage_data={},
+        current_stage_status={},
+        stage_key="asset_pipeline",
+        task_id="task-auto",
+        actor="tester",
+        result={"summary": "assets compiled"},
+        next_version=4,
+        execution_mode="automatic",
+    )
+    assert auto_data["asset_pipeline"]["automation"]["auto_advance"] is True
+    assert auto_status["asset_pipeline"]["state"] == "completed"
+    assert auto_status["image_runtime"]["state"] == "active"
+    assert auto_event["next_stage_key"] == "image_runtime"
 
 
 def test_industrial_overview_exposes_nine_implementation_phases():
@@ -212,6 +262,8 @@ def test_jellyfish_industrial_routes_are_registered():
     assert "loadWorkflowState" in industrial_source
     assert "editWorkflowState" in industrial_source
     assert "regenerateWorkflowStage" in industrial_source
+    assert "completeWorkflowStage" in industrial_source
+    assert "createTextToDrama" in industrial_source
     assert "CineForgeWorkflowState" in industrial_source
     assert "GenerationTaskLink" in industrial_source
 
@@ -236,7 +288,15 @@ def test_project_workbench_surfaces_film_core_from_lobby_and_generated_client():
     assert "CineForge 可编辑工作流状态" in film_core_source
     assert "保存阶段编辑" in film_core_source
     assert "重生成阶段" in film_core_source
+    assert "阶段推进开关" in film_core_source
+    assert "完成并推进" in film_core_source
+    assert "文本生成漫剧" in lobby_source
+    assert "fallbackRatio || '9:16'" in (front_dir / "pages" / "aiStudio" / "chapter" / "ChapterStudio.tsx").read_text(
+        encoding="utf-8"
+    )
     assert "Film Core Overview" in film_core_source
+    assert "createTextToDrama" in film_service_source
+    assert "completeWorkflowStage" in film_service_source
     assert "loadWorkflowState" in film_service_source
     assert "editWorkflowState" in film_service_source
     assert "regenerateWorkflowStage" in film_service_source

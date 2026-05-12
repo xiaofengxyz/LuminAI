@@ -169,8 +169,12 @@ Implemented in this repository:
 - `vendor/jellyfish`: pinned upstream Jellyfish Studio OS base.
 - `vendor/jellyfish/backend/app/models/industrial.py`: persisted
   `CineForgeWorkflowState` table for stage edits and regeneration history.
-- `vendor/jellyfish/backend/app/api/v1/routes/film/industrial.py`: overview,
-  workflow-state load/edit/regenerate, plan, and run endpoints.
+- `vendor/jellyfish/backend/app/api/v1/routes/film/industrial.py`:
+  text-to-drama, overview, workflow-state load/edit/regenerate/complete, plan,
+  and run endpoints.
+- `vendor/jellyfish/backend/app/services/llm/manage.py`: runtime-config
+  adapter views for provider/model base URL and key state without exposing
+  secrets.
 
 The current bridge defines this workflow order:
 
@@ -206,6 +210,7 @@ generation, QA, and retry.
 | Phase 8 | Done | Added Jellyfish-native industrial Film Core overview and plan-preview APIs plus a Project Workbench `Film Core` tab. The tab now surfaces the starter-kit `9/9` implementation evidence and the 11-node production pipeline. |
 | Phase 9 | Done | Added Film Core `run` API and UI action that writes render, QA, retry, post-production, or blocker-gate records into live Jellyfish `generation_tasks` and `generation_task_links`. |
 | Phase 10 | Done | Added persisted CineForge workflow-state load/edit/regenerate APIs and Film Core tab controls; edits and targeted regeneration requests are versioned and written to the Jellyfish task ledger. |
+| Phase 11 | Done | Added text-to-drama intake, per-stage automatic/manual switches, stage completion gates, and generic cinematic runtime provider registry/config views. |
 | Product Follow-up | Next | Bind provider/runtime workers to execute those task records and attach real generated media, QA reports, retry outcomes, and exports. |
 
 The starter-kit nine implementation phases are complete. Their evidence is

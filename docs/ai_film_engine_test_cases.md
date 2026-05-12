@@ -34,12 +34,13 @@
 
 | Case | Command / Test | Expected result |
 | --- | --- | --- |
-| Industrial service contract | `python3 -m pytest -q -s tests/test_jellyfish_industrial_film_core.py` | Overview maps Jellyfish state into all 11 pipeline stages, exposes 9/9 starter-kit implementation phases, plan exposes render/QA/retry/post contracts, and CineForge workflow state exposes persisted edit/regenerate contracts. |
-| Workflow state backend contract | `.venv/bin/python -m pytest -q -s tests/test_industrial_workflow_state.py` from `vendor/jellyfish/backend` | Persisted `CineForgeWorkflowState` initializes nine stages; editing a stage creates a succeeded workflow-edit task; regenerating a stage creates a pending stage-regenerate task and task link. |
-| Backend route import | `PYTHONPATH=. .venv/bin/python -c "from app.api.v1.routes.film.industrial import router; print(len(router.routes))"` from `vendor/jellyfish/backend` | Prints `6`, covering overview, workflow-state load/edit/regenerate, plan, and run endpoints. |
-| Frontend type safety | `npx pnpm@9.15.9 run typecheck` from `vendor/jellyfish/front` | Project Workbench `Film Core` tab, OpenAPI generated client wrapper, workflow-state controls, and generated types typecheck. |
-| Manual UI smoke | Open `/projects/{projectId}?tab=filmCore` in Jellyfish frontend | Film Core tab shows `九阶段交付状态`, persisted `CineForge 可编辑工作流状态`, 11-node production pipeline, consistency health, pain-point diagnosis, plan button, stage edit button, stage regenerate button, and reference project breakdown inside the existing Jellyfish workbench. |
-| Reboot service recovery | Start backend with `.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8011`, then start frontend with `VITE_BACKEND_URL=http://127.0.0.1:8011 npx pnpm@9.15.9 run dev:film-core` | `/health` returns 200, `http://localhost:7790/projects` returns the Vite HTML shell, and the Film Core toolbar button remains discoverable even when the project list is empty. |
+| Industrial service contract | `python3 -m pytest -q -s tests/test_jellyfish_industrial_film_core.py` | Overview maps Jellyfish state into all 11 pipeline stages, exposes 9/9 starter-kit implementation phases, plan exposes render/QA/retry/post contracts, and CineForge workflow state exposes persisted edit/regenerate/automation contracts. |
+| Workflow state backend contract | `.venv/bin/python -m pytest -q -s tests/test_industrial_workflow_state.py` from `vendor/jellyfish/backend` | Persisted `CineForgeWorkflowState` initializes nine stages; editing creates a succeeded workflow-edit task; regenerating creates a pending stage-regenerate task; completing a stage either auto-activates the next stage or stops with `waiting_operator`; text-to-drama creates project/chapters/shots/workflow tasks. |
+| Backend route import | `PYTHONPATH=. .venv/bin/python -c "from app.api.v1.routes.film.industrial import router; print(len(router.routes))"` from `vendor/jellyfish/backend` | Prints `8`, covering text-to-drama, overview, workflow-state load/edit/regenerate/complete, plan, and run endpoints. |
+| Frontend type safety | `npx pnpm@9.15.9 run typecheck` from `vendor/jellyfish/front` | Project Workbench `Film Core` tab, OpenAPI generated client wrapper, text-to-drama entry, workflow-state automation controls, and generated types typecheck. |
+| Manual UI smoke | Open `/projects/{projectId}?tab=filmCore` in Jellyfish frontend | Film Core tab shows `九阶段交付状态`, persisted `CineForge 可编辑工作流状态`, automatic/manual stage switch, complete/regenerate/edit buttons, 11-node production pipeline, consistency health, pain-point diagnosis, plan button, and reference project breakdown inside the existing Jellyfish workbench. |
+| Text-to-drama UI smoke | Open `http://localhost:7790/projects`, click `文本生成漫剧` | A source text can create a project, multiple chapters, shot seeds, workflow state, and task-ledger entries, then navigate to `/projects/{projectId}?tab=filmCore`. |
+| Reboot service recovery | Run `scripts/start_jellyfish_film_core.sh` or start backend with `.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8011`, then start frontend with `VITE_BACKEND_URL=http://127.0.0.1:8011 npx pnpm@9.15.9 run dev:film-core` | `/health` returns 200 with `curl --noproxy '*'`, `http://localhost:7790/projects` returns the Vite HTML shell, and the Film Core/text-to-drama toolbar buttons remain discoverable even when the project list is empty. |
 | CORS and runtime backend | `python3 -m pytest -q -s tests/test_jellyfish_cors_runtime_config.py` | Frontend runtime defaults to Jellyfish backend `8011`; `/api/v1/studio/projects` and `/api/v1/film/tasks?recent_seconds=15&page=1&page_size=50` return CORS headers for local frontend port `7790`. |
 | Industrial run writeback | `POST /api/v1/film/industrial/projects/{projectId}/run` | Creates Jellyfish `generation_tasks` and `generation_task_links` for render, QA, retry, post-production, or a blocker gate task. |
 | Jellyfish backend regression | `.venv/bin/python -m pytest -q -s` from `vendor/jellyfish/backend` | Full backend suite passes, including CORS middleware, Studio APIs, task center, response envelopes, and video capability mapping. |
@@ -52,6 +53,7 @@
 | Media refs | `python3 -m pytest -q -s tests/test_media_refs.py tests/test_provider_media.py` | Local, URL, and OSS media modes resolve deterministically. |
 | Kling routing | `python3 -m pytest -q -s tests/test_kling_provider_routing.py` | Kling requests are routed without leaking story logic into the provider. |
 | Vidu routing | `python3 -m pytest -q -s tests/test_vidu_provider_routing.py` | Vidu requests preserve runtime adapter contracts. |
+| Jellyfish runtime model config | `.venv/bin/python -m pytest -q -s tests/test_llm_manage.py` from `vendor/jellyfish/backend` | Provider registry includes cinematic runtime gateways; model runtime config resolves category-specific base URL and key-configured state without leaking secrets. |
 
 ## 6. Full Regression
 
@@ -98,6 +100,11 @@ Check:
 - `CineForge 可编辑工作流状态` renders nine persisted stages; saving a stage
   edit creates a `cineforge_workflow_edit` ledger task and stage regeneration
   creates a `cineforge_stage_regenerate` ledger task
+- The stage switch can set `automatic` or `manual`; completing an automatic
+  stage activates the next stage, and completing a manual stage records
+  `waiting_operator`
+- The project list `文本生成漫剧` entry creates multiple chapters and ready shot
+  seeds from one text input, then opens Film Core
 - Clicking `创建生产任务` writes industrial task records into the Jellyfish task
   center; projects without ready shots get an `industrial_gate` blocker record
 
@@ -105,8 +112,9 @@ Check:
 
 - Demo QA metrics are deterministic test metrics, not real CV detectors.
 - Real provider rendering requires credentials and worker binding.
-- Jellyfish now has native Film Core overview, plan preview, and task writeback
-  endpoints plus persisted workflow-state edit/regenerate endpoints. Actual
+- Jellyfish now has native Film Core overview, text-to-drama intake, plan
+  preview, and task writeback endpoints plus persisted workflow-state
+  edit/regenerate/complete endpoints. Actual
   provider media files and production CV/CLIP/face/outfit QA detectors still
   require provider/runtime worker integration.
 - In an earlier session, Jellyfish Docker Compose full-stack startup was blocked by a

@@ -5,3 +5,7 @@ Requirements:
 - Support edit/regenerate
 - Integrate QA and Retry
 - Reuse Jellyfish systems
+
+Automation Switch:
+- `execution_mode=automatic`: build character bible, scene bible, shot graph and storyboard state, then advance to Image Runtime.
+- `execution_mode=manual`: persist asset/storyboard output, then stop for user confirmation or correction.

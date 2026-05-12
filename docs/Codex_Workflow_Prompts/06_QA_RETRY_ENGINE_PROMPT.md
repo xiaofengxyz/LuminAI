@@ -5,3 +5,7 @@ Requirements:
 - Support edit/regenerate
 - Integrate QA and Retry
 - Reuse Jellyfish systems
+
+Automation Switch:
+- `execution_mode=automatic`: score continuity/identity/motion, queue targeted retries, then advance to Studio UI/final packaging gates.
+- `execution_mode=manual`: persist QA findings and retry candidates, then stop for user decision.

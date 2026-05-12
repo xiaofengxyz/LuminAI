@@ -2,6 +2,17 @@
 
 Current task: Implement the industrial AI film engine requirements inside the existing Jellyfish UI/backend, keep a single-agent execution path, update progress continuously, test, run, clean, resolve conflicts, and push necessary changes.
 
+## Session 2026-05-12 - Text-To-Drama Automation And Runtime Adapter Closure
+
+| Node | Status | Evidence |
+| --- | --- | --- |
+| 1. Plan and baseline review | Done | Single-agent execution confirmed; no `standards/` directory exists in the repo, so root `AGENTS.md` and `docs/Codex_Workflow_Prompts/` are active constraints. Recovered the interrupted worktree: runtime adapter, no-proxy startup, workflow automation, text-to-drama intake, tests, and docs were partially staged as working-tree changes. |
+| 2. Runtime adapter and service recovery implementation | Done | Widened the provider adapter boundary beyond OpenAI/Volcengine, added registry entries for ComfyUI/FLUX/SDXL/StoryDiffusion/Kling/Seedance/Veo/Wan2.1/Sora/Vidu, added no-proxy startup handling with detached `setsid`/`nohup` service launch, switched frontend backend defaults to `127.0.0.1:8011`, and ignored `.runtime/` logs. |
+| 3. Workflow automation and text-to-drama implementation | Done | Added backend schema/service support for per-stage automatic/manual execution gates, stage completion, and text-to-drama project/chapter/shot/workflow intake; frontend Project Lobby exposes `文本生成漫剧` and Film Core exposes stage switch plus `完成并推进`. |
+| 4. Test-engineer pass | Done | Targeted root `python3 -m pytest -q -s tests/test_jellyfish_industrial_film_core.py tests/test_jellyfish_cors_runtime_config.py` passed 12; targeted Jellyfish backend `.venv/bin/python -m pytest -q -s tests/test_industrial_workflow_state.py tests/test_llm_manage.py tests/test_script_processing_tasks.py tests/test_script_processing_async_api.py tests/test_generated_video_api_responses.py tests/test_task_execute.py` passed 66; root full `python3 -m pytest -q -s` passed 151; Jellyfish backend full `.venv/bin/python -m pytest -q -s` passed 294; frontend `npx pnpm@9.15.9 run typecheck` passed; frontend `npx pnpm@9.15.9 run build` passed with the existing large-chunk warning; Film Core route import prints `8` and LLM runtime-config route import prints `True`. |
+| 5. Documentation and user manual | Done | README, system architecture, industrial review, Jellyfish blueprint, test cases, Jellyfish site docs, and project function manual document text-to-drama, workflow automation gates, runtime adapter config, UI operation, pain-point coverage, and zero-to-multi-episode usage. Live smoke started services with `scripts/start_jellyfish_film_core.sh`; backend `/health` returned 200 and frontend `/projects` returned 809 bytes. Temporary text-to-drama project `codex-smoke-text-drama-0512` created 2 chapters, 6 shot seeds, 9 workflow stages, auto-advanced `asset_pipeline -> image_runtime`, produced a plan with 6 render queue items, and was deleted. |
+| 6. Cleanup, conflict scan, commit, push | In Progress | Removed test/build caches while preserving tracked Jellyfish `.cursor` cache files and running `.runtime/` logs; conflict marker scan found none; root and Jellyfish `git diff --check` passed; Jellyfish implementation commit `63bea76` is ready to push. |
+
 ## Session 2026-05-12 - CineForge Workflow State Closure
 
 | Node | Status | Evidence |

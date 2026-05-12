@@ -326,15 +326,17 @@ Direct URL -> /projects/{project_id}?tab=filmCore
 Backend endpoints:
 
 ```text
+POST  /api/v1/film/industrial/text-to-drama
 GET   /api/v1/film/industrial/projects/{project_id}/overview
 GET   /api/v1/film/industrial/projects/{project_id}/workflow-state
 PATCH /api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}
 POST  /api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/regenerate
+POST  /api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/complete
 POST  /api/v1/film/industrial/projects/{project_id}/plan
 POST  /api/v1/film/industrial/projects/{project_id}/run
 ```
 
-Local frontend runtime defaults to Jellyfish backend `http://localhost:8011`.
+Local frontend runtime defaults to Jellyfish backend `http://127.0.0.1:8011`.
 Use the `dev:film-core` script when you want the operator UI to be predictably
 available at `http://localhost:7790/projects`; backend CORS also allows other
 local Vite ports when the port is intentionally changed.
@@ -387,6 +389,9 @@ the workflow version, and writes a succeeded `cineforge_workflow_edit` task.
 `cineforge_stage_regenerate` task linked to the same workflow. This is the
 edit/regenerate loop required by the CineForge prompts, and it reuses Jellyfish
 task tables instead of inventing a second queue.
+`POST /workflow-state/{stage_key}/complete` applies the stage switch:
+automatic stages activate the next stage, while manual stages stop with
+`waiting_operator`.
 
 The plan endpoint returns a preview contract for render queue entries, QA
 thresholds, retry repair patches, post-production steps, and current blockers.
@@ -425,6 +430,10 @@ Implemented:
 - batch render queue planning
 - persisted nine-stage CineForge workflow state
 - stage-level edit and targeted regeneration controls
+- stage-level automatic/manual execution switches and completion gates
+- text-to-drama intake from one source text into project, episodes, shot seeds,
+  workflow state, and task ledger
+- provider/model runtime config isolation with base URL and key presence checks
 - Jellyfish-native Project Workbench `Film Core` tab
 - task-center writeback through `generation_tasks` and `generation_task_links`
 - CORS/runtime defaults for `7790 -> 8011`
@@ -443,10 +452,14 @@ Industry pain points addressed:
 - shot continuity breakage: Story Graph and Director Planner are explicit stages
 - prompt randomness: prompt compiler contracts replace freehand prompt splicing
 - vendor lock-in: runtime adapters keep providers behind one boundary
+- model endpoint sprawl: providers and models isolate base URLs and API keys
+  from story/runtime orchestration
 - manual QA bottleneck: QA tasks and thresholds are structured and repeatable
 - expensive blind retry: Retry Engine produces targeted repair patches
 - destructive rework after edits: workflow stages are versioned and can be
   regenerated one at a time
+- risky full automation: manual switches intentionally halt at
+  `waiting_operator` when a stage needs user approval
 - batch chaos: Film Core creates queueable tasks with task-link writeback
 
 Remaining production integration work is provider-specific worker binding and
@@ -468,19 +481,31 @@ from a blank local setup.
 git submodule update --init --recursive
 ```
 
-2. Start Jellyfish backend on the Film Core default port.
+2. Start Jellyfish backend and frontend on the Film Core default ports.
+
+Recommended one-command local startup:
+
+```bash
+scripts/start_jellyfish_film_core.sh
+```
+
+This helper exports `NO_PROXY=localhost,127.0.0.1,::1` and uses local direct
+URLs. Without that bypass, a host proxy can return `502 Bad Gateway` for
+`127.0.0.1:8011` even when uvicorn is healthy.
+
+Manual backend startup:
 
 ```bash
 cd vendor/jellyfish/backend
-NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 \
+NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1 \
 .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8011
 ```
 
 3. Confirm backend health.
 
 ```bash
-NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 \
-curl http://127.0.0.1:8011/health
+NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1 \
+curl --noproxy '*' http://127.0.0.1:8011/health
 ```
 
 Expected response:
@@ -513,11 +538,75 @@ a concrete project.
 侧边栏 -> 模型管理 -> Providers / Models / Settings
 ```
 
-At minimum, set one default image model and one default video model. The Film
-Core can plan without credentials, but real image/video generation requires
-valid provider keys.
+At minimum:
 
-### 12.2 Create A Series Project
+1. Add a Provider.
+2. Fill `文本/通用 Base URL`.
+3. Optionally fill `图片 Base URL` and `视频 Base URL` when a gateway separates
+   image and video endpoints.
+4. Fill `API Key` and `API Secret` if that provider requires them.
+5. Add text/image/video Models and bind each model to a Provider.
+6. Open `Settings` and choose default text, image, and video models.
+
+The runtime adapter boundary resolves each model to:
+
+```text
+provider_key + category + base_url + api_key_configured + model params
+```
+
+Secrets are stored in Jellyfish provider records and are not returned by the
+runtime-config API. Built-in provider keys include OpenAI, 火山引擎, 阿里百炼,
+ComfyUI, FLUX, SDXL, StoryDiffusion, Kling, Seedance, Veo, Wan2.1, Sora, and
+Vidu. The Film Core can plan without credentials, but real generation workers
+require valid provider keys and reachable base URLs.
+
+### 12.2 Fast Path: Text To Multi-Episode AI Manju
+
+Use this path for the final product goal:
+
+```text
+输入一段文字 -> 生成/扩展小说状态 -> 生成多集漫剧生产状态 -> 进入 Film Core 自动闭环
+```
+
+1. Open:
+
+```text
+http://localhost:7790/projects
+```
+
+2. Click `文本生成漫剧`.
+3. Fill:
+
+- `项目名称` or leave it blank to use the first sentence
+- `原始创意/梗概/正文`
+- visual style and project style
+- episode count, for example `3`
+- shots per episode, for example `6`
+- default video ratio, usually `9:16`
+- flow switch: `自动推进` or `人工停等`
+
+4. Click `创建并进入 Film Core`.
+
+The backend creates:
+
+- one Jellyfish project
+- one chapter per episode
+- shot seeds for every episode
+- `CineForgeWorkflowState`
+- `cineforge_text_to_drama_intake` task
+- `cineforge_text_to_drama_auto_pipeline` task when automation is enabled
+
+You land at:
+
+```text
+/projects/{project_id}?tab=filmCore
+```
+
+From there, continue with the Film Core sections below. Automatic mode moves
+stages forward until a stage is configured as manual. Manual mode creates the
+recoverable state and waits for you to approve/edit/regenerate.
+
+### 12.3 Create A Series Project Manually
 
 1. Open `项目列表`.
 2. Click `新建项目`.
@@ -535,7 +624,7 @@ valid provider keys.
 The project seed and unified style become global consistency constraints. Do
 not change them mid-series unless you intentionally want a visual reset.
 
-### 12.3 Build Multiple Episodes Or Chapters
+### 12.4 Build Multiple Episodes Or Chapters
 
 In Jellyfish this project stores episodes as chapters.
 
@@ -552,7 +641,7 @@ In Jellyfish this project stores episodes as chapters.
 5. Keep character names, locations, key props, and outfits stable across
 chapters. The extraction and Film Core layers depend on stable names.
 
-### 12.4 Extract Story Graph And Shot Lists
+### 12.5 Extract Story Graph And Shot Lists
 
 For each chapter:
 
@@ -564,7 +653,7 @@ For each chapter:
 This creates the Story Graph stage. It is the backbone for long-story
 continuity; do not skip it for multi-episode production.
 
-### 12.5 Prepare Characters, Assets, And Director Data
+### 12.6 Prepare Characters, Assets, And Director Data
 
 1. Open `演员`, `角色`, `场景`, `道具`, and `服装`.
 2. Create the reusable assets:
@@ -592,7 +681,7 @@ continuity; do not skip it for multi-episode production.
 
 This turns the project from text into controllable film state.
 
-### 12.6 Use Film Core Overview
+### 12.7 Use Film Core Overview
 
 Open Film Core from any of these entry points:
 
@@ -616,7 +705,7 @@ If the page says the project has blockers, resolve them in the normal Jellyfish
 pages first. Film Core intentionally points back to the right production object
 instead of hiding problems behind a one-click button.
 
-### 12.7 Edit Or Regenerate CineForge Workflow State
+### 12.8 Edit, Regenerate, Or Auto-Advance CineForge Workflow State
 
 Use `CineForge 可编辑工作流状态` when the producer or director changes the plan
 after seeing the Film Core diagnosis.
@@ -639,15 +728,24 @@ final_integration
 shot graph, image/video runtime policy, QA policy, or integration contract that
 the engine will use.
 3. Type the reason for the change in the note box.
-4. Click `保存阶段编辑` when you want to persist a structured operator override.
-5. Click `重生成阶段` when that one stage should be recomputed or handed to a
+4. Use `阶段推进开关`:
+
+- `自动`: after the stage is completed, the next stage becomes active
+- `人工`: after the stage is completed, the workflow records `waiting_operator`
+  and stops for user operation
+
+5. Click `保存阶段编辑` when you want to persist a structured operator override.
+6. Click `重生成阶段` when that one stage should be recomputed or handed to a
 provider worker again.
+7. Click `完成并推进` when this stage's current output is accepted and the switch
+should be applied.
 
 The edit action increments the workflow version and creates a
 `cineforge_workflow_edit` task. The regenerate action creates a
-`cineforge_stage_regenerate` task. Both are linked back to the same workflow
-state, so approved shots and accepted media do not need to be thrown away just
-because one stage changed.
+`cineforge_stage_regenerate` task. Completing a stage creates either
+`cineforge_stage_auto_advance` or `cineforge_stage_manual_gate`. All are linked
+back to the same workflow state, so approved shots and accepted media do not
+need to be thrown away just because one stage changed.
 
 Use this for:
 
@@ -657,7 +755,7 @@ Use this for:
 - asking video runtime to preserve approved outputs while refreshing one stage
 - tightening QA/retry policy before batch production
 
-### 12.8 Generate A Closed-Loop Plan
+### 12.9 Generate A Closed-Loop Plan
 
 In `Film Core`:
 
@@ -673,7 +771,7 @@ In `Film Core`:
 
 The plan is a preview. It tells you what the system will queue and why.
 
-### 12.9 Create Production Tasks
+### 12.10 Create Production Tasks
 
 In `Film Core`:
 
@@ -694,7 +792,7 @@ These records are written to Jellyfish `generation_tasks` and
 `generation_task_links`. That gives the batch pipeline durable state and makes
 the tasks visible in the existing UI.
 
-### 12.10 Generate Media
+### 12.11 Generate Media
 
 For each ready shot:
 
@@ -708,7 +806,7 @@ The industrial task ledger and the normal video generation tasks share the same
 task-center substrate. This keeps Film Core orchestration separate from
 provider execution.
 
-### 12.11 QA And Retry
+### 12.12 QA And Retry
 
 After videos exist:
 
@@ -725,7 +823,7 @@ Retry repair patches should target specific causes:
 - first/key/last-frame reference reuse
 - camera/action completeness
 
-### 12.12 Final Editing And Export
+### 12.13 Final Editing And Export
 
 When accepted clips exist:
 
@@ -746,7 +844,7 @@ The post-production task created by Film Core records the intended export scope
 and writeback targets, while actual file creation remains with the editor and
 runtime workers.
 
-### 12.13 Multi-Episode Continuity Checklist
+### 12.14 Multi-Episode Continuity Checklist
 
 Before starting the next episode, check:
 
@@ -762,3 +860,37 @@ Before starting the next episode, check:
 
 That loop is the production rhythm: chapter text, shot graph, assets, Film Core,
 task queue, generation, QA, retry, editing, then next episode.
+
+### 12.15 Completion, UI Scope, And Pain-Point Answer
+
+Are the requested document functions done?
+
+- Workflow persistence: done through `cineforge_workflow_states`.
+- Edit/regenerate: done through workflow-state `PATCH` and regenerate `POST`.
+- Automatic/manual switches: done per stage through `execution_mode`, the Film
+  Core switch, and the complete-stage endpoint.
+- Text-to-drama entry: done through `POST /api/v1/film/industrial/text-to-drama`
+  and the `文本生成漫剧` project-list UI.
+- Runtime adapter isolation: done through Provider/Model settings, category
+  base URL overrides, no-secret runtime-config views, and provider registry
+  keys for mainstream image/video runtimes.
+- QA/retry/task ledger: done as queueable Jellyfish `generation_tasks` and
+  `generation_task_links`.
+
+Does this involve page UI operation?
+
+Yes. The operable UI surfaces are:
+
+- `项目列表 -> 文本生成漫剧`
+- `项目列表/项目卡片/项目速览 -> Film Core`
+- `Project Workbench -> Film Core`
+- `模型管理 -> Providers / Models / Settings`
+- normal Jellyfish chapter, shot, asset, task center, and editor pages
+
+Does it address industry pain points?
+
+Yes at the orchestration and state layer: character/scene/prop/costume
+continuity, prompt drift, runtime lock-in, destructive producer edits, retry
+chaos, and batch task visibility now have explicit state and task-ledger
+contracts. Remaining production work is not architecture; it is binding concrete
+provider workers and real CV/CLIP/face/outfit detector implementations.
