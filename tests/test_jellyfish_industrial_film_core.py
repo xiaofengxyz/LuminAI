@@ -68,6 +68,12 @@ def test_industrial_overview_maps_jellyfish_state_to_full_film_pipeline():
     assert overview["industrial_score"] >= 80
     assert overview["asset_health"]["summary"] == "ready"
     assert overview["qa_retry"]["automatic_retry_enabled"] is True
+    assert overview["shooting_gate"]["ready"] is True
+    assert [entry["key"] for entry in overview["creation_entries"]] == [
+        "blank_project",
+        "text_to_drama",
+        "film_core",
+    ]
     assert any(item["name"] == "Jellyfish" for item in overview["reference_projects"])
 
 
@@ -84,9 +90,12 @@ def test_closed_loop_plan_exposes_render_qa_retry_and_post_contracts():
         shot_count=2,
         ready_shot_count=2,
         generated_video_count=0,
-        detail_count=1,
+        detail_count=2,
         character_count=1,
-        actor_link_count=0,
+        actor_link_count=1,
+        scene_link_count=2,
+        prop_link_count=1,
+        costume_link_count=1,
         shot_ids=("shot-a", "shot-b"),
         ready_shot_ids=("shot-a", "shot-b"),
     )
@@ -100,7 +109,36 @@ def test_closed_loop_plan_exposes_render_qa_retry_and_post_contracts():
     assert plan["qa_policy"]["face_similarity_min"] > 0.8
     assert plan["retry_policy"]["planned_retry_candidates"] == 2
     assert plan["post_production"]["enabled"] is False
-    assert any(blocker["severity"] == "high" for blocker in plan["blockers"])
+    assert plan["overview"]["shooting_gate"]["ready"] is True
+    assert not any(blocker["severity"] == "high" for blocker in plan["blockers"])
+
+
+def test_closed_loop_plan_blocks_shooting_until_asset_bible_is_ready():
+    snapshot = IndustrialProjectSnapshot(
+        project_id="proj-blocked",
+        project_name="Blocked",
+        project_style="真人科幻",
+        visual_style="现实",
+        seed=1,
+        unify_style=True,
+        script_text_length=500,
+        chapter_count=1,
+        shot_count=2,
+        ready_shot_count=2,
+        generated_video_count=0,
+        detail_count=2,
+        character_count=1,
+        actor_link_count=0,
+        shot_ids=("shot-a", "shot-b"),
+        ready_shot_ids=("shot-a", "shot-b"),
+    )
+
+    plan = build_closed_loop_plan(snapshot, provider="kling", model="kling-v1", output_dir="output/test")
+
+    assert plan["render_queue"] == []
+    assert plan["overview"]["shooting_gate"]["ready"] is False
+    assert plan["overview"]["shooting_gate"]["state"] == "blocked_before_shooting"
+    assert any("角色缺少演员形象" in blocker["action"] for blocker in plan["blockers"])
 
 
 def test_writeback_summary_counts_render_qa_retry_and_post_targets():
@@ -286,11 +324,14 @@ def test_project_workbench_surfaces_film_core_from_lobby_and_generated_client():
     assert "Film Core 状态" in lobby_source
     assert "创建生产任务" in film_core_source
     assert "CineForge 可编辑工作流状态" in film_core_source
+    assert "拍摄前置门禁" in film_core_source
+    assert "创建入口职责" in film_core_source
     assert "保存阶段编辑" in film_core_source
     assert "重生成阶段" in film_core_source
     assert "阶段推进开关" in film_core_source
     assert "完成并推进" in film_core_source
     assert "文本生成漫剧" in lobby_source
+    assert "reference_harvest_enabled" in lobby_source
     assert "fallbackRatio || '9:16'" in (front_dir / "pages" / "aiStudio" / "chapter" / "ChapterStudio.tsx").read_text(
         encoding="utf-8"
     )

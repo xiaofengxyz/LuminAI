@@ -2,6 +2,17 @@
 
 Current task: Implement the industrial AI film engine requirements inside the existing Jellyfish UI/backend, keep a single-agent execution path, update progress continuously, test, run, clean, resolve conflicts, and push necessary changes.
 
+## Session 2026-05-13 - AI Manju Product Gap Closure
+
+| Node | Status | Evidence |
+| --- | --- | --- |
+| 1. Plan and baseline review | Done | Single-agent execution confirmed; no `standards/` directory exists, so root `AGENTS.md` and `docs/Codex_Workflow_Prompts/` are active constraints. Baseline gap review found text-to-drama created project/chapter/shot seeds but needed stronger novel manuscript generation, episode script/storyboard output, asset/VFX extraction, role reference harvest planning, clearer entry semantics, and a hard shooting readiness gate. |
+| 2. Text-to-drama blueprint and persistence | Done | Added modular `app/services/film/text_to_drama.py`; `POST /text-to-drama` now expands source text into novel manuscript, per-episode scripts, storyboard shots, character/scene/prop/costume/VFX bibles, frame slots, shot links, and role web reference harvest tasks. |
+| 3. Shooting readiness and UI/API alignment | Done | Added Film Core `creation_entries` and `shooting_gate`; closed-loop plans now produce no render queue when the gate fails; Project Lobby labels blank project vs one-click text-to-drama vs Film Core; Film Core tab renders gate blockers and entry responsibilities. Targeted backend workflow tests passed 5, root Film Core/CORS tests passed 13, frontend typecheck passed, and route import prints `8`. |
+| 4. Test-engineer pass | Done | Root full `python3 -m pytest -q -s` passed 152; Jellyfish backend full `.venv/bin/python -m pytest -q -s` passed 295; frontend `npx pnpm@9.15.9 run build` passed with the existing large-chunk warning. Live smoke restarted stale services, verified `/health` 200 and `/projects` 809 bytes, created temporary project `codex-smoke-text-drama-0513`, generated 2 chapters, 6 shots, 4 characters, 4 reference-harvest tasks, `shooting_gate.ready=true`, 6 render queue items, and deleted the project. |
+| 5. Documentation and user manual | Done | README, system architecture, industrial review, Jellyfish blueprint, test cases, and project function manual now document creation-entry semantics, generated novel/episode/script/storyboard/asset/reference-harvest behavior, shooting gate, pain-point coverage, UI operation, and zero-to-multi-episode usage. |
+| 6. Cleanup, conflict scan, commit, push | In Progress | Removed Python/pytest caches and frontend `dist` while preserving `.venv`, `.cursor`, and running `.runtime/` logs; conflict marker scan found none; root and Jellyfish `git diff --check` passed; Jellyfish implementation commit `7cc5d8f` is ready for push. |
+
 ## Session 2026-05-12 - Text-To-Drama Automation And Runtime Adapter Closure
 
 | Node | Status | Evidence |

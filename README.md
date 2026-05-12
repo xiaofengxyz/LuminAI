@@ -141,6 +141,20 @@ nine Prompt-derived modules also has an automatic/manual switch: automatic
 completion activates the next stage, while manual completion records a
 `waiting_operator` gate.
 
+The project list intentionally has three separate surfaces:
+
+- `新建空项目`: creates only a blank Jellyfish project shell for teams that
+  already have scripts or assets.
+- `一键文本生成漫剧`: expands one source text into generated novel chapters,
+  episode scripts, storyboard shots, character/scene/prop/costume/VFX bibles,
+  frame slots, role web reference-harvest tasks, and CineForge workflow state.
+- `Film Core`: opens the existing-project production control center.
+
+Film Core now includes a `shooting_gate`. If characters, actor identity
+references, scenes, props, costumes, shot details, or ready shots are missing,
+the closed-loop plan returns no render queue. This prevents shooting from
+starting before the asset bible exists.
+
 Industrial Film Core endpoints:
 
 ```text

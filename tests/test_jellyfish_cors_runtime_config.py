@@ -56,6 +56,6 @@ def test_project_lobby_keeps_film_core_discoverable_without_projects() -> None:
     assert "handleOpenFilmCoreEntry" in lobby_source
     assert "handleOpenTextToDrama" in lobby_source
     assert "文本生成漫剧" in lobby_source
-    assert "选择或创建项目后查看 Film Core" in lobby_source
+    assert "先新建空项目或一键文本生成漫剧，再进入 Film Core" in lobby_source
     assert "Film Core 是项目级 overview" in lobby_source
     assert "disabled={!selectedProject}" not in lobby_source

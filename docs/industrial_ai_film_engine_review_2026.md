@@ -158,7 +158,8 @@ industrial intelligence that makes outputs repeatable.
 | No final editing closure | Voice, subtitles, compose, concat, and export must be planned. | `PostProductionPlanner` and FFmpeg step compiler. |
 | No operator UI | Operators need stage, shot, QA, retry, and base status in the same production workspace. | Jellyfish Project Workbench `Film Core` tab plus `/api/v1/film/industrial/...`. |
 | Destructive rework after producer edits | A producer must be able to edit or regenerate one stage without resetting the episode. | `CineForgeWorkflowState`, workflow-state edit/regenerate APIs, task-ledger mutation history. |
-| One prompt cannot become a durable series | Source text must become project, episode, shot, workflow, and task state. | `text-to-drama` intake creates Jellyfish project/chapters/shots plus CineForge workflow and task ledger. |
+| One prompt cannot become a durable series | Source text must become novel, episodes, assets, shots, workflow, and task state. | `text-to-drama` intake creates generated novel chapters, script outlines, storyboard shots, asset bibles, reference-harvest tasks, CineForge workflow, and task ledger. |
+| Shooting before assets exist | A project must not render before characters, identity references, scenes, props, costumes, and shot details exist. | Film Core `shooting_gate` blocks render queues and disables production task creation until prerequisites are ready. |
 | Automation without control is risky | Some stages should run through, others should wait for producer approval. | Per-stage `execution_mode` switches auto-advance or halt with `waiting_operator`. |
 
 ## 6. Architecture From Zero
@@ -210,9 +211,10 @@ Key design rules:
 | Final editing | `src/film_engine/post_production.py` |
 | Batch planning | `src/film_engine/batch.py` |
 | Jellyfish-native industrial API | `vendor/jellyfish/backend/app/services/industrial_film_core.py`, `vendor/jellyfish/backend/app/api/v1/routes/film/industrial.py` |
+| Text-to-drama blueprint compiler | `vendor/jellyfish/backend/app/services/film/text_to_drama.py` |
 | CineForge workflow persistence | `vendor/jellyfish/backend/app/models/industrial.py`, workflow-state endpoints, `vendor/jellyfish/backend/tests/test_industrial_workflow_state.py` |
 | Jellyfish-native Film Core UI | `vendor/jellyfish/front/src/pages/aiStudio/project/ProjectWorkbench/tabs/FilmCoreTab.tsx`, `vendor/jellyfish/front/src/services/industrialFilm.ts` |
-| Text-to-drama intake | `POST /api/v1/film/industrial/text-to-drama`, `ProjectLobby.tsx` `文本生成漫剧` modal |
+| Text-to-drama intake | `POST /api/v1/film/industrial/text-to-drama`, `ProjectLobby.tsx` `一键文本生成漫剧` modal |
 | Runtime adapter config | Jellyfish `Provider`/`Model` records, `/api/v1/llm/models/{model_id}/runtime-config`, provider registry bootstrap |
 
 ## 8. What Is Still Not Claimed Done
@@ -229,10 +231,12 @@ Done in the Jellyfish-native pass:
 - surfaced pipeline stage evidence, consistency health, QA/retry readiness,
   pain-point diagnosis, reference project breakdown, workflow-stage editing,
   targeted stage regeneration, and plan preview
+- added deterministic text-to-novel/storyboard/asset blueprint generation,
+  role web reference-harvest task creation, and a hard shooting gate before
+  render queues are exposed
 
 Still required for true industrial deployment:
 
-- bind LuminAI planner output back into live Jellyfish DB/API records
 - execute real video renders through production credentials
 - replace demo QA metrics with CV/CLIP/face/outfit/light detectors
 - persist generated media and final provider retry results in Jellyfish media
@@ -252,8 +256,10 @@ This pass is acceptable when:
   Novel/Script to Final Editing industrial pipeline state.
 - `/api/v1/film/industrial/projects/{project_id}/workflow-state` persists and
   returns the nine-stage CineForge workflow state.
-- `/api/v1/film/industrial/text-to-drama` creates project, episode/chapter,
-  shot-seed, workflow, and task-ledger state from one source text.
+- `/api/v1/film/industrial/text-to-drama` creates project, generated novel
+  chapters, script outlines, storyboard shots, character/actor/costume/scene/prop
+  records, frame slots, reference-harvest tasks, workflow, and task-ledger state
+  from one source text.
 - `PATCH /workflow-state/{stage_key}` saves stage edits and creates a
   `cineforge_workflow_edit` task ledger event.
 - `POST /workflow-state/{stage_key}/regenerate` queues a targeted
@@ -261,7 +267,8 @@ This pass is acceptable when:
 - `POST /workflow-state/{stage_key}/complete` applies automatic/manual stage
   gates and records either auto-advance or `waiting_operator`.
 - `/api/v1/film/industrial/projects/{project_id}/plan` returns render queue,
-  QA policy, retry policy, post-production steps, and blockers.
+  QA policy, retry policy, post-production steps, and blockers; render queue is
+  empty when `shooting_gate.ready=false`.
 - `/api/v1/llm/models/{model_id}/runtime-config` resolves provider/model
   runtime adapter state without exposing secret values.
 - Jellyfish Project Workbench includes a `Film Core` tab and the dashboard links

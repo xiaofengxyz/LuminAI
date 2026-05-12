@@ -20,7 +20,7 @@
 
 ## Data Flow
 
-Source Text → Text-To-Drama Intake → Novel/Script → Jellyfish Project/Chapter/Shot Workspace → LuminAI Platform Bridge → Story Graph → Director Planner → Film Core → Prompt Compiler → Runtime Adapter → Render Runtime → Video Models → QA Engine → Retry Engine → Final Editing
+Source Text → Text-To-Drama Intake → Generated Novel → Episode Scripts → Asset Bible / Reference Harvest → Jellyfish Project/Chapter/Shot Workspace → Story Graph → Director Planner → Film Core Shooting Gate → Prompt Compiler → Runtime Adapter → Render Runtime → Video Models → QA Engine → Retry Engine → Final Editing
 
 ## Implemented Foundation
 
@@ -66,9 +66,12 @@ Each CineForge stage now carries an explicit `execution_mode` switch. In
 stage. In `manual` mode, completion records `waiting_operator` so a producer can
 review, edit, or regenerate before the graph advances. The
 `/api/v1/film/industrial/text-to-drama` endpoint creates a Jellyfish project,
-episodes-as-chapters, shot seeds, workflow state, and task-ledger entries from
-one source text input, which is the project-level entry point for
-text-to-novel-to-AI-drama production.
+generated novel chapters, per-episode script outlines, storyboard shots,
+character/actor/costume/scene/prop assets, VFX notes, frame slots, role web
+reference-harvest tasks, workflow state, and task-ledger entries from one source
+text input. Film Core then exposes a `shooting_gate`; render queues stay empty
+until script, shot graph, characters, identity references, scenes, props,
+costumes, shot details, and ready shots exist.
 
 Model execution stays behind the Jellyfish provider/model adapter boundary:
 providers store `base_url`, optional image/video base URL overrides, and

@@ -367,6 +367,15 @@ This is rendered in the `Film Core` tab as the `九阶段交付状态` panel, so
 producer can see that the nine implementation phases are complete without
 opening repository docs.
 
+The same overview also exposes two producer-facing control contracts:
+
+- `creation_entries`: explains the three creation surfaces. `新建空项目` only
+  creates a blank Project shell; `一键文本生成漫剧` creates the story/assets/shots
+  from one text; `Film Core` is the existing-project control center.
+- `shooting_gate`: blocks render queues until the project has novel/script
+  text, shot graph, characters, actor identity references, scenes, props,
+  costumes, shot details, and ready shots.
+
 The workflow-state endpoints persist the CineForge Prompt workflow as nine
 editable stages:
 
@@ -395,6 +404,9 @@ automatic stages activate the next stage, while manual stages stop with
 
 The plan endpoint returns a preview contract for render queue entries, QA
 thresholds, retry repair patches, post-production steps, and current blockers.
+If `shooting_gate.ready=false`, the plan intentionally returns an empty render
+queue and high-severity blockers. This prevents the old failure mode where a
+project could be sent to shooting before characters or assets existed.
 The run endpoint writes the industrial loop into Jellyfish task records:
 
 - `industrial_video_render` tasks linked to shot video relations
@@ -431,8 +443,9 @@ Implemented:
 - persisted nine-stage CineForge workflow state
 - stage-level edit and targeted regeneration controls
 - stage-level automatic/manual execution switches and completion gates
-- text-to-drama intake from one source text into project, episodes, shot seeds,
-  workflow state, and task ledger
+- text-to-drama intake from one source text into generated novel manuscript,
+  multi-episode scripts, storyboard shots, character/scene/prop/costume/VFX
+  bibles, role web reference-harvest tasks, workflow state, and task ledger
 - provider/model runtime config isolation with base URL and key presence checks
 - Jellyfish-native Project Workbench `Film Core` tab
 - task-center writeback through `generation_tasks` and `generation_task_links`
@@ -574,7 +587,7 @@ Use this path for the final product goal:
 http://localhost:7790/projects
 ```
 
-2. Click `文本生成漫剧`.
+2. Click `一键文本生成漫剧`.
 3. Fill:
 
 - `项目名称` or leave it blank to use the first sentence
@@ -584,6 +597,10 @@ http://localhost:7790/projects
 - shots per episode, for example `6`
 - default video ratio, usually `9:16`
 - flow switch: `自动推进` or `人工停等`
+- `创建角色网络参考采集任务`: leave enabled when the engine should queue
+  candidate image/video reference searches for each character. The task records
+  collect URL and licensing metadata only; real downloads and commercial use
+  still require a later worker or operator approval.
 
 4. Click `创建并进入 Film Core`.
 
@@ -591,9 +608,18 @@ The backend creates:
 
 - one Jellyfish project
 - one chapter per episode
-- shot seeds for every episode
+- generated novel text in each chapter's `raw_text`
+- script outlines in each chapter's `condensed_text`
+- storyboard shots for every episode
+- `ShotDetail` rows with camera, movement, duration, action beats, frame prompts,
+  scene binding, and VFX notes
+- character, actor-image slot, costume, scene, prop, and prop-owner records
+- shot-to-character, shot-to-scene, shot-to-prop, and shot-to-costume links
+- first/key/last frame image slots for each shot
 - `CineForgeWorkflowState`
 - `cineforge_text_to_drama_intake` task
+- one `cineforge_reference_harvest` task per generated character when reference
+  harvest is enabled
 - `cineforge_text_to_drama_auto_pipeline` task when automation is enabled
 
 You land at:
@@ -609,7 +635,7 @@ recoverable state and waits for you to approve/edit/regenerate.
 ### 12.3 Create A Series Project Manually
 
 1. Open `项目列表`.
-2. Click `新建项目`.
+2. Click `新建空项目`.
 3. Fill:
 
 - project name, for example `霓虹审判`
@@ -696,10 +722,13 @@ Open Film Core from any of these entry points:
 Read these panels in order:
 
 1. `九阶段交付状态`: confirms the implementation stack is complete.
-2. `工业化分数`: tells whether this project is ready for batch production.
-3. `一致性健康`: shows identity, scene, prop, and costume readiness.
-4. `痛点诊断`: explains why a project is still fragile.
-5. `生产闭环`: shows the 11 runtime stages from script to final editing.
+2. `拍摄前置门禁`: tells whether render tasks are allowed yet.
+3. `创建入口职责`: explains why blank project, one-click text-to-drama, and
+   Film Core are separate surfaces.
+4. `工业化分数`: tells whether this project is ready for batch production.
+5. `一致性健康`: shows identity, scene, prop, and costume readiness.
+6. `痛点诊断`: explains why a project is still fragile.
+7. `生产闭环`: shows the 11 runtime stages from script to final editing.
 
 If the page says the project has blockers, resolve them in the normal Jellyfish
 pages first. Film Core intentionally points back to the right production object
@@ -769,7 +798,9 @@ In `Film Core`:
 - post-production steps
 - blockers
 
-The plan is a preview. It tells you what the system will queue and why.
+The plan is a preview. It tells you what the system will queue and why. If the
+shooting gate is blocked, the render queue is empty by design; resolve the gate
+before attempting production.
 
 ### 12.10 Create Production Tasks
 
@@ -788,7 +819,8 @@ industrial_post_production
 industrial_gate
 ```
 
-These records are written to Jellyfish `generation_tasks` and
+This button is disabled while `拍摄前置门禁` is blocked. Once the gate is ready,
+records are written to Jellyfish `generation_tasks` and
 `generation_task_links`. That gives the batch pipeline durable state and makes
 the tasks visible in the existing UI.
 
@@ -870,7 +902,11 @@ Are the requested document functions done?
 - Automatic/manual switches: done per stage through `execution_mode`, the Film
   Core switch, and the complete-stage endpoint.
 - Text-to-drama entry: done through `POST /api/v1/film/industrial/text-to-drama`
-  and the `文本生成漫剧` project-list UI.
+  and the `一键文本生成漫剧` project-list UI. It now generates novel manuscript,
+  episode scripts, storyboard shots, asset bibles, frame slots, VFX notes, and
+  role reference-harvest tasks.
+- Shooting gate: done through Film Core `shooting_gate`; production plans do not
+  expose render queues until characters/assets/shot details are ready.
 - Runtime adapter isolation: done through Provider/Model settings, category
   base URL overrides, no-secret runtime-config views, and provider registry
   keys for mainstream image/video runtimes.
@@ -881,7 +917,7 @@ Does this involve page UI operation?
 
 Yes. The operable UI surfaces are:
 
-- `项目列表 -> 文本生成漫剧`
+- `项目列表 -> 一键文本生成漫剧`
 - `项目列表/项目卡片/项目速览 -> Film Core`
 - `Project Workbench -> Film Core`
 - `模型管理 -> Providers / Models / Settings`

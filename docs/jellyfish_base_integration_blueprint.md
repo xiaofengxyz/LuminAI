@@ -172,6 +172,9 @@ Implemented in this repository:
 - `vendor/jellyfish/backend/app/api/v1/routes/film/industrial.py`:
   text-to-drama, overview, workflow-state load/edit/regenerate/complete, plan,
   and run endpoints.
+- `vendor/jellyfish/backend/app/services/film/text_to_drama.py`: deterministic
+  text-to-novel, episode script, storyboard, asset bible, VFX, and role
+  reference-harvest blueprint compiler.
 - `vendor/jellyfish/backend/app/services/llm/manage.py`: runtime-config
   adapter views for provider/model base URL and key state without exposing
   secrets.
@@ -211,6 +214,7 @@ generation, QA, and retry.
 | Phase 9 | Done | Added Film Core `run` API and UI action that writes render, QA, retry, post-production, or blocker-gate records into live Jellyfish `generation_tasks` and `generation_task_links`. |
 | Phase 10 | Done | Added persisted CineForge workflow-state load/edit/regenerate APIs and Film Core tab controls; edits and targeted regeneration requests are versioned and written to the Jellyfish task ledger. |
 | Phase 11 | Done | Added text-to-drama intake, per-stage automatic/manual switches, stage completion gates, and generic cinematic runtime provider registry/config views. |
+| Phase 12 | Done | Upgraded text-to-drama from shot seeding to generated novel chapters, episode scripts, storyboard details, character/actor/costume/scene/prop assets, VFX notes, frame slots, role web reference-harvest tasks, creation-entry semantics, and a Film Core shooting gate that blocks render queues until prerequisites exist. |
 | Product Follow-up | Next | Bind provider/runtime workers to execute those task records and attach real generated media, QA reports, retry outcomes, and exports. |
 
 The starter-kit nine implementation phases are complete. Their evidence is
