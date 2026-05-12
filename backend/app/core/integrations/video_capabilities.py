@@ -65,6 +65,10 @@ def register_video_model_capability(
 
         register_openai_video_capability(model_prefix=model_prefix, capability=capability)
         return
+    if provider != "volcengine":
+        # Arbitrary runtime gateways keep the generic capability envelope until
+        # a concrete worker package registers tighter constraints.
+        return
     from app.core.integrations.volcengine.video_capabilities import register_volcengine_video_capability
 
     register_volcengine_video_capability(model_prefix=model_prefix, capability=capability)
@@ -82,6 +86,8 @@ def clear_video_model_capability_overrides(*, provider: ProviderKey | None = Non
     if provider == "openai":
         clear_openai_video_capability_overrides()
         return
+    if provider != "volcengine":
+        return
     clear_volcengine_video_capability_overrides()
 
 
@@ -90,6 +96,16 @@ def resolve_video_capability(*, provider: ProviderKey, model: str | None) -> Vid
         from app.core.integrations.openai.video_capabilities import resolve_openai_video_capability
 
         return resolve_openai_video_capability(model)
+    if provider != "volcengine":
+        return VideoModelCapability(
+            supports_seed=True,
+            supports_watermark=True,
+            allowed_ratios=set(ALLOWED_RATIOS),
+            default_ratio="16:9",
+            ratio_to_size_mapping=DEFAULT_RATIO_TO_SIZE_MAPPING,
+            min_seconds=1,
+            max_seconds=15,
+        )
     from app.core.integrations.volcengine.video_capabilities import resolve_volcengine_video_capability
 
     return resolve_volcengine_video_capability(model)

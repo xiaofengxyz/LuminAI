@@ -23,14 +23,17 @@ from app.schemas.llm import (
     ProviderCreate,
     ProviderRead,
     ProviderSupportedRead,
+    RuntimeModelConfigRead,
     VideoGenerationOptionsRead,
     ProviderUpdate,
 )
 from app.services.llm.provider_registry import (
+    get_provider_spec,
     is_provider_category_supported,
     list_registered_providers,
     resolve_provider_key_from_name,
 )
+from app.services.llm.provider_resolver import resolve_effective_base_url
 from app.bootstrap import bootstrap_all_registries
 from app.services.common import (
     create_and_refresh,
@@ -213,6 +216,39 @@ async def get_model(
 ) -> Model:
     """获取模型。"""
     return await get_or_404(db, Model, model_id, detail=entity_not_found("Model"))
+
+
+async def get_runtime_model_config(
+    db: AsyncSession,
+    *,
+    model_id: str,
+) -> RuntimeModelConfigRead:
+    """返回模型调用所需的隔离适配层配置，不泄露 api_key/api_secret。"""
+    model = await get_or_404(db, Model, model_id, detail=entity_not_found("Model"))
+    provider = await get_or_404(db, Provider, model.provider_id, detail=entity_not_found("Provider"))
+    provider_key = resolve_provider_key_from_name(provider.name)
+    spec = get_provider_spec(provider_key)
+    base_url = resolve_effective_base_url(
+        provider=provider,
+        provider_key=provider_key,
+        category=model.category,
+    )
+    category_value = model.category.value if isinstance(model.category, ModelCategoryKey) else str(model.category)
+    return RuntimeModelConfigRead(
+        model_id=model.id,
+        model_name=model.name,
+        category=model.category,
+        provider_id=provider.id,
+        provider_key=provider_key,
+        provider_display_name=spec.display_name,
+        base_url=base_url,
+        api_key_required=spec.requires_api_key,
+        api_key_configured=bool((provider.api_key or "").strip()),
+        api_secret_required=spec.requires_api_secret,
+        api_secret_configured=bool((provider.api_secret or "").strip()),
+        isolated_adapter=f"{provider_key}:{category_value}",
+        params=dict(model.params or {}),
+    )
 
 
 async def update_model(

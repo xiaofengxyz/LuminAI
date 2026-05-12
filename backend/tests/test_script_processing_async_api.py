@@ -74,6 +74,30 @@ def test_divide_async_returns_created_task_payload(client, monkeypatch) -> None:
     assert called["task_id"] == "task-1"
 
 
+def test_divide_sync_falls_back_when_llm_runtime_is_unavailable(client, monkeypatch) -> None:
+    async def _fake_get_llm(_db):
+        raise RuntimeError("default text model missing")
+
+    monkeypatch.setattr(script_processing_route, "get_nothinking_llm", _fake_get_llm)
+    app.dependency_overrides[get_db] = _override_db()
+    try:
+        response = client.post(
+            "/api/v1/script-processing/divide",
+            json={
+                "chapter_id": "chapter-1",
+                "script_text": "雨夜，少女推开旧剧院大门。剧本开始发光。",
+                "write_to_db": False,
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["total_shots"] >= 1
+    assert "fallback" in body["data"]["notes"]
+
+
 def test_extract_async_returns_created_task_payload(client, monkeypatch) -> None:
     called: dict[str, str] = {}
 

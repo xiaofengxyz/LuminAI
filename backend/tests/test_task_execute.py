@@ -145,6 +145,30 @@ def test_enqueue_task_execution_records_executor(monkeypatch, tmp_path) -> None:
     sync_engine.dispose()
 
 
+def test_enqueue_task_execution_best_effort_records_pending_worker(monkeypatch) -> None:
+    recorded: dict[str, str | None] = {}
+
+    def _fake_delay(_task_id: str):
+        raise RuntimeError("redis unavailable")
+
+    def _fake_record(task_id: str, *, executor_type: str, executor_task_id: str | None) -> None:
+        recorded["task_id"] = task_id
+        recorded["executor_type"] = executor_type
+        recorded["executor_task_id"] = executor_task_id
+
+    monkeypatch.setattr(execute_task_module.run_task_celery, "delay", _fake_delay)
+    monkeypatch.setattr(execute_task_module, "_record_executor_dispatch", _fake_record)
+
+    result = execute_task_module.enqueue_task_execution_best_effort("task-pending", inline_fallback=False)
+
+    assert result.fallback is True
+    assert recorded == {
+        "task_id": "task-pending",
+        "executor_type": "pending_worker",
+        "executor_task_id": None,
+    }
+
+
 def test_revoke_task_execution_revokes_celery_task(monkeypatch, tmp_path) -> None:
     db_path = tmp_path / "task-revoke.db"
     sync_engine = create_engine(f"sqlite:///{db_path}", future=True)

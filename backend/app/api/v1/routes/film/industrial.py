@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -19,6 +19,8 @@ from app.models.studio import (
     ProjectCostumeLink,
     ProjectPropLink,
     ProjectSceneLink,
+    ProjectStyle,
+    ProjectVisualStyle,
     Shot,
     ShotCandidateStatus,
     ShotDetail,
@@ -28,19 +30,25 @@ from app.models.studio import (
     ShotExtractedDialogueCandidate,
     ShotFrameImage,
     ShotStatus,
+    CameraAngle,
+    CameraMovement,
+    CameraShotType,
+    ChapterStatus,
 )
 from app.models.industrial import CineForgeWorkflowState
 from app.models.task import GenerationTask, GenerationTaskStatus
 from app.models.task_links import GenerationTaskLink, GenerationTaskLinkStatus
 from app.schemas.common import ApiResponse, success_response
-from app.services.common import entity_not_found
+from app.services.common import entity_already_exists, entity_not_found
 from app.services.industrial_film_core import (
+    CINEFORGE_WORKFLOW_STAGES,
     IndustrialProjectSnapshot,
     build_cineforge_regenerate_payload,
     build_cineforge_workflow_state,
     build_closed_loop_plan,
     build_industrial_overview,
     build_writeback_summary,
+    complete_cineforge_stage,
     ensure_cineforge_stage,
     mark_cineforge_regeneration_queued,
     patch_cineforge_stage_data,
@@ -227,6 +235,14 @@ class FilmIndustrialRunRead(BaseModel):
     overview: FilmIndustrialOverviewRead
 
 
+class FilmWorkflowAutomationRead(BaseModel):
+    mode: Literal["automatic", "manual"]
+    auto_advance: bool
+    stop_after_stage: bool
+    manual_allowed: bool = True
+    next_stage_key: str | None = None
+
+
 class FilmWorkflowStageRead(BaseModel):
     key: str
     title: str
@@ -235,6 +251,8 @@ class FilmWorkflowStageRead(BaseModel):
     editable: bool
     regeneratable: bool
     qa_gate: str
+    default_execution_mode: Literal["automatic", "manual"]
+    automation: FilmWorkflowAutomationRead
     status: dict[str, Any]
     data: dict[str, Any]
 
@@ -255,6 +273,7 @@ class FilmWorkflowStateRead(BaseModel):
     last_task_id: str | None = None
     edit_contract: dict[str, Any]
     regenerate_contract: dict[str, Any]
+    automation_contract: dict[str, Any]
 
 
 class FilmWorkflowStatePatchRequest(BaseModel):
@@ -262,6 +281,11 @@ class FilmWorkflowStatePatchRequest(BaseModel):
     actor: str = Field("operator", description="编辑者标识")
     note: str = Field("", description="本次编辑说明")
     patch: dict[str, Any] = Field(default_factory=dict, description="结构化阶段补丁")
+    execution_mode: Literal["automatic", "manual"] | None = Field(
+        None,
+        description="阶段执行开关；automatic 自动进入下一阶段，manual 阶段结束后停等人工",
+    )
+    auto_advance: bool | None = Field(None, description="automatic 模式下是否自动推进下一阶段")
 
 
 class FilmWorkflowRegenerateRequest(BaseModel):
@@ -273,10 +297,47 @@ class FilmWorkflowRegenerateRequest(BaseModel):
     model: str = Field("project_default_model", description="重生成任务模型逻辑名")
 
 
+class FilmWorkflowStageCompleteRequest(BaseModel):
+    chapter_id: str | None = Field(None, description="可选章节 ID；为空时推进项目级工作流")
+    actor: str = Field("operator", description="操作者标识")
+    result: dict[str, Any] = Field(default_factory=dict, description="阶段执行结果摘要")
+    execution_mode: Literal["automatic", "manual"] | None = Field(
+        None,
+        description="本次完成时临时覆盖阶段执行开关",
+    )
+
+
 class FilmWorkflowMutationRead(BaseModel):
     workflow: FilmWorkflowStateRead
     task: FilmQueuedTaskRead | None = None
     event: dict[str, Any]
+
+
+class FilmTextToDramaRequest(BaseModel):
+    source_text: str = Field(..., min_length=1, description="用户输入的一段创意、梗概或原始文本")
+    project_id: str | None = Field(None, description="可选项目 ID；为空则自动生成")
+    project_name: str | None = Field(None, description="可选项目名称；为空从文本生成")
+    episode_count: int = Field(3, ge=1, le=50, description="生成多集漫剧的集数")
+    shots_per_episode: int = Field(6, ge=1, le=30, description="每集初始镜头数")
+    style: ProjectStyle = Field(ProjectStyle.guoman, description="项目题材/风格")
+    visual_style: ProjectVisualStyle = Field(ProjectVisualStyle.anime, description="画面表现形式")
+    default_video_ratio: str = Field("9:16", description="默认视频比例")
+    automation_mode: Literal["automatic", "manual"] = Field(
+        "automatic",
+        description="全流程默认开关；automatic 进入自动任务账本，manual 创建后停等人工",
+    )
+    provider: str = Field("project_default_video_provider", description="生产计划使用的供应商逻辑名")
+    model: str = Field("project_default_video_model", description="生产计划使用的模型逻辑名")
+
+
+class FilmTextToDramaRead(BaseModel):
+    project: FilmProjectBriefRead
+    chapters: list[FilmChapterBriefRead]
+    created_shot_count: int
+    workflow: FilmWorkflowStateRead
+    tasks: list[FilmQueuedTaskRead]
+    next_url: str
+    usage: dict[str, Any]
 
 
 @router.get(
@@ -294,6 +355,191 @@ async def get_industrial_overview(
 
     snapshot = await load_industrial_snapshot(db, project_id=project_id, chapter_id=chapter_id)
     payload = FilmIndustrialOverviewRead.model_validate(build_industrial_overview(snapshot))
+    return success_response(payload)
+
+
+@router.post(
+    "/text-to-drama",
+    response_model=ApiResponse[FilmTextToDramaRead],
+    summary="从一段文字创建多集 AI 漫剧生产入口",
+    operation_id="createTextToDrama",
+)
+async def create_text_to_drama(
+    body: FilmTextToDramaRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[FilmTextToDramaRead]:
+    """Create a recoverable project/chapter/shot/workflow ledger from source text."""
+
+    project_id = body.project_id or f"cfproj-{uuid4().hex[:12]}"
+    if await db.get(Project, project_id) is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=entity_already_exists("Project"))
+
+    source_text = body.source_text.strip()
+    project_name = (body.project_name or _title_from_source_text(source_text)).strip()
+    project = Project(
+        id=project_id,
+        name=project_name,
+        description=source_text[:240],
+        style=body.style,
+        visual_style=body.visual_style,
+        seed=_stable_seed_from_text(source_text),
+        unify_style=True,
+        progress=5,
+        default_video_ratio=body.default_video_ratio,
+        stats={
+            "chapters": body.episode_count,
+            "shots": body.episode_count * body.shots_per_episode,
+            "source": "text_to_drama",
+            "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        },
+    )
+    db.add(project)
+
+    chunks = _split_source_text(source_text, body.episode_count)
+    created_chapters: list[Chapter] = []
+    created_shot_count = 0
+    for episode_index, chunk in enumerate(chunks, start=1):
+        chapter_id = f"{project_id}-ep-{episode_index:02d}"
+        chapter = Chapter(
+            id=chapter_id,
+            project_id=project_id,
+            index=episode_index,
+            title=f"第{episode_index}集",
+            summary=_summary_from_text(chunk),
+            raw_text=chunk,
+            condensed_text=chunk[:1200],
+            storyboard_count=body.shots_per_episode,
+            status=ChapterStatus.shooting if body.automation_mode == "automatic" else ChapterStatus.draft,
+        )
+        db.add(chapter)
+        created_chapters.append(chapter)
+        for shot_index, excerpt in enumerate(_shot_excerpts(chunk, body.shots_per_episode), start=1):
+            shot_id = f"{chapter_id}-s{shot_index:03d}"
+            db.add(
+                Shot(
+                    id=shot_id,
+                    chapter_id=chapter_id,
+                    index=shot_index,
+                    title=f"镜头 {shot_index:03d}",
+                    status=ShotStatus.ready if body.automation_mode == "automatic" else ShotStatus.pending,
+                    script_excerpt=excerpt,
+                    skip_extraction=body.automation_mode == "automatic",
+                )
+            )
+            db.add(
+                ShotDetail(
+                    id=shot_id,
+                    camera_shot=CameraShotType.ms,
+                    angle=CameraAngle.eye_level,
+                    movement=CameraMovement.static,
+                    duration=6,
+                    override_video_ratio=body.default_video_ratio,
+                    mood_tags=["origin_text", "auto_seed"],
+                    atmosphere=_summary_from_text(excerpt),
+                    action_beats=[excerpt],
+                )
+            )
+            created_shot_count += 1
+
+    await db.flush()
+    snapshot = await load_industrial_snapshot(db, project_id=project_id)
+    row = await _load_or_create_workflow_state(db, snapshot)
+    automation_patch = _workflow_automation_patch(body.automation_mode)
+    row.stage_data = _with_stage_data(
+        row.stage_data or {},
+        {
+            "novel_engine": {
+                "source_text_seed": source_text[:2000],
+                "target_episode_count": body.episode_count,
+                "goal": "expand source text into a serialized novel, then into AI drama episodes",
+            },
+            "final_integration": {
+                "user_goal": "输入一段文字 -> 自动生成小说 -> 自动生成多集 AI 漫剧",
+                "default_provider": body.provider,
+                "default_model": body.model,
+            },
+        },
+        automation_patch=automation_patch,
+    )
+    row.stage_status = _with_stage_status(row.stage_status or {}, automation_patch=automation_patch)
+    row.status = "running" if body.automation_mode == "automatic" else "waiting_operator"
+    row.version = int(row.version or 1) + 1
+
+    intake_task = await _record_workflow_task(
+        db,
+        workflow_id=row.id,
+        task_kind="cineforge_text_to_drama_intake",
+        payload={
+            "project_id": project_id,
+            "workflow_id": row.id,
+            "episode_count": body.episode_count,
+            "shots_per_episode": body.shots_per_episode,
+            "automation_mode": body.automation_mode,
+        },
+        terminal=True,
+        purpose="create project, episodes, shot graph seeds, and CineForge workflow from user text",
+    )
+    tasks = [intake_task]
+    if body.automation_mode == "automatic":
+        tasks.append(
+            await _record_workflow_task(
+                db,
+                workflow_id=row.id,
+                task_kind="cineforge_text_to_drama_auto_pipeline",
+                payload={
+                    "project_id": project_id,
+                    "workflow_id": row.id,
+                    "provider": body.provider,
+                    "model": body.model,
+                    "entry_stage": "novel_engine",
+                    "target": "novel_to_ai_drama",
+                },
+                terminal=False,
+                purpose="auto-run CineForge stages until a manual stage switch is encountered",
+            )
+        )
+    row.last_task_id = tasks[-1]["task_id"]
+    row.edit_log = [
+        *(row.edit_log or []),
+        {
+            "stage_key": "novel_engine",
+            "actor": "text_to_drama",
+            "note": "created from source text",
+            "automation_mode": body.automation_mode,
+            "version": row.version,
+            "task_id": row.last_task_id,
+            "created_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        },
+    ]
+    await db.flush()
+    await db.refresh(row)
+
+    payload = FilmTextToDramaRead.model_validate(
+        {
+            "project": {
+                "id": project.id,
+                "name": project.name,
+                "style": _value(project.style),
+                "visual_style": _value(project.visual_style),
+                "seed": int(project.seed or 0),
+                "unify_style": bool(project.unify_style),
+            },
+            "chapters": [
+                {"id": c.id, "title": c.title, "index": c.index}
+                for c in created_chapters
+            ],
+            "created_shot_count": created_shot_count,
+            "workflow": _workflow_state_payload(snapshot, row),
+            "tasks": tasks,
+            "next_url": f"/projects/{project_id}?tab=filmCore",
+            "usage": {
+                "source_text_chars": len(source_text),
+                "episode_count": body.episode_count,
+                "shots_per_episode": body.shots_per_episode,
+                "automation_mode": body.automation_mode,
+            },
+        }
+    )
     return success_response(payload)
 
 
@@ -346,6 +592,8 @@ async def edit_workflow_state(
         actor=body.actor,
         note=body.note,
         next_version=next_version,
+        execution_mode=body.execution_mode,
+        auto_advance=body.auto_advance,
     )
     task = await _record_workflow_task(
         db,
@@ -442,6 +690,82 @@ async def regenerate_workflow_stage(
             "workflow": _workflow_state_payload(snapshot, row),
             "task": task,
             "event": row.regenerate_log[-1],
+        }
+    )
+    return success_response(payload)
+
+
+@router.post(
+    "/projects/{project_id}/workflow-state/{stage_key}/complete",
+    response_model=ApiResponse[FilmWorkflowMutationRead],
+    summary="完成 CineForge 工作流阶段并按开关推进",
+    operation_id="completeWorkflowStage",
+)
+async def complete_workflow_stage(
+    project_id: str,
+    stage_key: str,
+    body: FilmWorkflowStageCompleteRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[FilmWorkflowMutationRead]:
+    """Complete a stage; automatic stages activate the next stage, manual stages halt."""
+
+    try:
+        ensure_cineforge_stage(stage_key)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    snapshot = await load_industrial_snapshot(db, project_id=project_id, chapter_id=body.chapter_id)
+    row = await _load_or_create_workflow_state(db, snapshot)
+    next_version = int(row.version or 1) + 1
+    current_payload = _workflow_state_payload(snapshot, row)
+    current_stage = next((item for item in current_payload["stages"] if item["key"] == stage_key), None)
+    current_mode = body.execution_mode or (
+        current_stage.get("automation", {}).get("mode") if isinstance(current_stage, dict) else None
+    )
+    is_automatic = current_mode == "automatic"
+    task = await _record_workflow_task(
+        db,
+        workflow_id=row.id,
+        task_kind="cineforge_stage_auto_advance" if is_automatic else "cineforge_stage_manual_gate",
+        payload={
+            "workflow_id": row.id,
+            "stage_key": stage_key,
+            "actor": body.actor,
+            "result": body.result,
+            "execution_mode": current_mode,
+            "version": next_version,
+        },
+        terminal=not is_automatic,
+        purpose="complete CineForge stage and apply automatic/manual gate",
+    )
+    try:
+        stage_data, stage_status, complete_entry = complete_cineforge_stage(
+            current_stage_data=row.stage_data or {},
+            current_stage_status=row.stage_status or {},
+            stage_key=stage_key,
+            task_id=task["task_id"],
+            actor=body.actor,
+            result=body.result,
+            next_version=next_version,
+            execution_mode=body.execution_mode,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    row.version = next_version
+    row.status = "running" if is_automatic else "waiting_operator"
+    row.stage_data = stage_data
+    row.stage_status = stage_status
+    row.regenerate_log = [*(row.regenerate_log or []), complete_entry]
+    row.last_task_id = task["task_id"]
+    await db.flush()
+    await db.refresh(row)
+
+    payload = FilmWorkflowMutationRead.model_validate(
+        {
+            "workflow": _workflow_state_payload(snapshot, row),
+            "task": task,
+            "event": complete_entry,
         }
     )
     return success_response(payload)
@@ -921,6 +1245,100 @@ def _queued_task(
         "progress": progress,
         "purpose": purpose,
     }
+
+
+def _title_from_source_text(source_text: str) -> str:
+    first_line = next((line.strip() for line in source_text.splitlines() if line.strip()), "")
+    if not first_line:
+        return "AI 漫剧项目"
+    return first_line[:32]
+
+
+def _stable_seed_from_text(source_text: str) -> int:
+    seed = 0
+    for index, char in enumerate(source_text[:4000], start=1):
+        seed = (seed + index * ord(char)) % 100000
+    return seed
+
+
+def _summary_from_text(text: str, limit: int = 120) -> str:
+    normalized = " ".join(text.strip().split())
+    return normalized[:limit] if normalized else "待生成剧情摘要"
+
+
+def _split_source_text(source_text: str, episode_count: int) -> list[str]:
+    normalized = source_text.strip()
+    if episode_count <= 1:
+        return [normalized]
+    paragraphs = [part.strip() for part in normalized.splitlines() if part.strip()]
+    if len(paragraphs) >= episode_count:
+        groups = [[] for _ in range(episode_count)]
+        for index, paragraph in enumerate(paragraphs):
+            groups[index % episode_count].append(paragraph)
+        return ["\n".join(group).strip() or normalized for group in groups]
+
+    chunk_size = max(1, (len(normalized) + episode_count - 1) // episode_count)
+    return [
+        normalized[index * chunk_size : (index + 1) * chunk_size].strip() or normalized
+        for index in range(episode_count)
+    ]
+
+
+def _shot_excerpts(chapter_text: str, shot_count: int) -> list[str]:
+    compact = " ".join(chapter_text.strip().split())
+    if not compact:
+        return ["待生成镜头内容" for _ in range(shot_count)]
+    chunk_size = max(1, (len(compact) + shot_count - 1) // shot_count)
+    excerpts = [
+        compact[index * chunk_size : (index + 1) * chunk_size].strip()
+        for index in range(shot_count)
+    ]
+    return [excerpt or compact[:120] for excerpt in excerpts]
+
+
+def _workflow_automation_patch(mode: str) -> dict[str, dict[str, Any]]:
+    is_auto = mode == "automatic"
+    return {
+        str(stage["key"]): {
+            "mode": mode,
+            "auto_advance": is_auto,
+            "stop_after_stage": not is_auto,
+            "manual_allowed": True,
+        }
+        for stage in CINEFORGE_WORKFLOW_STAGES
+    }
+
+
+def _with_stage_data(
+    current: dict[str, Any],
+    patches: dict[str, dict[str, Any]],
+    *,
+    automation_patch: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    data = dict(current or {})
+    for stage in CINEFORGE_WORKFLOW_STAGES:
+        key = str(stage["key"])
+        stage_data = dict(data.get(key) or {})
+        stage_data.update(patches.get(key, {}))
+        stage_data["automation"] = automation_patch[key]
+        data[key] = stage_data
+    return data
+
+
+def _with_stage_status(
+    current: dict[str, Any],
+    *,
+    automation_patch: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    status_data = dict(current or {})
+    for stage in CINEFORGE_WORKFLOW_STAGES:
+        key = str(stage["key"])
+        stage_status = dict(status_data.get(key) or {})
+        stage_status["automation"] = automation_patch[key]
+        if key == "workflow_architecture":
+            stage_status.setdefault("state", "active")
+        status_data[key] = stage_status
+    return status_data
 
 
 async def _load_chapters(db: AsyncSession, project_id: str) -> list[Chapter]:

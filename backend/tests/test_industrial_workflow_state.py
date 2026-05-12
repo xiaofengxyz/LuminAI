@@ -5,8 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 import app.models  # noqa: F401
 from app.api.v1.routes.film.industrial import (
+    FilmTextToDramaRequest,
     FilmWorkflowRegenerateRequest,
+    FilmWorkflowStageCompleteRequest,
     FilmWorkflowStatePatchRequest,
+    complete_workflow_stage,
+    create_text_to_drama,
     edit_workflow_state,
     get_workflow_state,
     regenerate_workflow_stage,
@@ -138,6 +142,87 @@ async def test_workflow_state_edit_and_regenerate_are_versioned_task_ledger_even
         ]
         assert {link.resource_type for link in links} == {"workflow"}
         assert {link.relation_type for link in links} == {"cineforge_workflow_stage"}
+    finally:
+        await db.close()
+        await engine.dispose()
+
+
+async def test_workflow_stage_complete_uses_automatic_or_manual_gate():
+    db, engine = await _build_session()
+    try:
+        await _seed_project(db)
+
+        auto_response = await complete_workflow_stage(
+            "project-1",
+            "asset_pipeline",
+            FilmWorkflowStageCompleteRequest(
+                actor="tester",
+                result={"summary": "asset bible generated"},
+            ),
+            db=db,
+        )
+
+        assert auto_response.data is not None
+        assert auto_response.data.workflow.stage_status["asset_pipeline"]["state"] == "completed"
+        assert auto_response.data.workflow.stage_status["image_runtime"]["state"] == "active"
+        assert auto_response.data.task is not None
+        assert auto_response.data.task.task_kind == "cineforge_stage_auto_advance"
+        assert auto_response.data.task.status == "pending"
+
+        manual_response = await complete_workflow_stage(
+            "project-1",
+            "studio_ui",
+            FilmWorkflowStageCompleteRequest(
+                actor="tester",
+                result={"summary": "operator reviewed UI gate"},
+            ),
+            db=db,
+        )
+
+        assert manual_response.data is not None
+        assert manual_response.data.workflow.status == "waiting_operator"
+        assert manual_response.data.workflow.stage_status["studio_ui"]["state"] == "waiting_operator"
+        assert manual_response.data.task is not None
+        assert manual_response.data.task.task_kind == "cineforge_stage_manual_gate"
+        assert manual_response.data.task.status == "succeeded"
+    finally:
+        await db.close()
+        await engine.dispose()
+
+
+async def test_text_to_drama_creates_project_episodes_shots_and_workflow_tasks():
+    db, engine = await _build_session()
+    try:
+        response = await create_text_to_drama(
+            FilmTextToDramaRequest(
+                source_text="少女在雨夜发现会发光的剧本，剧本每翻一页就改写城市记忆。",
+                project_name="雨夜发光剧本",
+                episode_count=2,
+                shots_per_episode=3,
+            ),
+            db=db,
+        )
+
+        assert response.data is not None
+        assert response.data.project.name == "雨夜发光剧本"
+        assert len(response.data.chapters) == 2
+        assert response.data.created_shot_count == 6
+        assert response.data.workflow.workflow_key == "cineforge_ai_drama_os"
+        assert response.data.workflow.stages[1].automation.mode == "automatic"
+        assert [task.task_kind for task in response.data.tasks] == [
+            "cineforge_text_to_drama_intake",
+            "cineforge_text_to_drama_auto_pipeline",
+        ]
+
+        chapters = (await db.execute(select(Chapter))).scalars().all()
+        shots = (await db.execute(select(Shot))).scalars().all()
+        tasks = (await db.execute(select(GenerationTask).order_by(GenerationTask.created_at))).scalars().all()
+        assert len(chapters) == 2
+        assert len(shots) == 6
+        assert [task.task_kind for task in tasks] == [
+            "cineforge_text_to_drama_intake",
+            "cineforge_text_to_drama_auto_pipeline",
+        ]
     finally:
         await db.close()
         await engine.dispose()

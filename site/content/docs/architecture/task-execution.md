@@ -19,7 +19,9 @@ weight: 7
 执行层
 ├── FastAPI 负责创建任务与返回 task_id
 ├── Redis 作为 Celery broker
-└── Celery Worker 执行长耗时任务
+├── Celery Worker 执行长耗时任务
+├── local inline fallback（仅本地 broker 不可用时兜底脚本文本任务）
+└── external runtime handoff（供应商 worker 尚未内置时保持任务账本可恢复）
 
 执行协议层
 ├── GenerationTask.task_kind
@@ -48,6 +50,8 @@ weight: 7
 - 前端不直接读取 Celery task 状态
 - Celery 只负责执行，不负责对前端暴露业务状态
 - 任务投递统一使用 `task_kind` 识别具体执行器
+- `executor_type` 当前用于诊断任务实际去向：`celery`、`pending_worker`、
+  `inline_fallback` 或 `external_runtime`
 
 全局任务列表接口当前规则：
 
@@ -161,6 +165,19 @@ Broker：Redis
 - worker 通过 `TaskExecutorRegistry` 按 `task_kind` 路由到具体 `WorkerTaskExecutor`
 - worker 执行后把状态与结果回写到 MySQL
 - 页面继续通过既有任务状态接口轮询和恢复
+
+本地开发容错规则：
+
+- 脚本类任务仍优先投递 Celery；当 Redis/Celery broker 不可用时，API
+  不再失败，而是记录 `executor_type=inline_fallback` 并在后台线程执行。
+- 图片/视频等 provider 任务仍优先投递 Celery；当 broker 不可用时，API
+  返回已创建的 `task_id`，任务记录为 `executor_type=pending_worker`，等待
+  worker 恢复后可重新调度或人工排查。
+- 视频模型供应商已被 Provider registry 识别、但当前代码没有内置 worker
+  工厂时，Motion/视频提交会创建任务账本并记录
+  `executor_type=external_runtime`，而不是在提交阶段同步报错。
+- 分镜 `script_divide` 在默认文本模型不可用或 LLM 调用失败时，会使用
+  规则化分句/分段算法生成可编辑 shot seeds，保证分镜流程可恢复。
 
 对核心任务（如 `divide`）进一步采用两阶段模型：
 

@@ -27,6 +27,7 @@ import {
   UnorderedListOutlined,
   BarsOutlined,
   DeploymentUnitOutlined,
+  RocketOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { chapters as mockChapters, projects as mockProjects, type Project } from '../../../mocks/data'
@@ -41,6 +42,7 @@ import { getChapterPreparationState } from './ProjectWorkbench/chapterPreparatio
 import { ensureHasShotsBeforeShooting } from './ProjectWorkbench/ensureHasShotsBeforeShooting'
 import { getChapterShotsPath, getChapterStudioPath, getProjectFilmCorePath } from './ProjectWorkbench/routes'
 import { loadProjectFlowStatsForChapters, type ProjectFlowStats } from './ProjectWorkbench/projectFlowStats'
+import { createTextToDrama } from '../../../services/industrialFilm'
 
 type ViewMode = 'grid' | 'compact' | 'large'
 type FilterTab = 'all' | 'editRaw' | 'extractShots' | 'prepareShots' | 'generating' | 'ready'
@@ -74,6 +76,8 @@ const ProjectLobby: React.FC = () => {
   const [multiSelectMode, setMultiSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [textToDramaModalOpen, setTextToDramaModalOpen] = useState(false)
+  const [textToDramaCreating, setTextToDramaCreating] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<ProjectView | null>(null)
   const [projectStageMap, setProjectStageMap] = useState<Record<string, ProjectStageSummary>>({})
@@ -84,6 +88,7 @@ const ProjectLobby: React.FC = () => {
     defaultVideoRatio,
   } = useProjectStyleOptions()
   const [form] = Form.useForm()
+  const [textToDramaForm] = Form.useForm()
   const [editForm] = Form.useForm()
 
   const useMock = import.meta.env.VITE_USE_MOCK === 'true'
@@ -383,6 +388,58 @@ const ProjectLobby: React.FC = () => {
       default_video_ratio: defaultVideoRatio,
     })
     setCreateModalOpen(true)
+  }
+
+  const handleOpenTextToDrama = () => {
+    textToDramaForm.resetFields()
+    const defaultVisual = (projectStyleOptions.visualStyles[0]?.value ?? '动漫') as ProjectVisualStyleChoice
+    const defaultStyle =
+      projectStyleOptions.defaultStyleByVisual?.[defaultVisual] ??
+      projectStyleOptions.stylesByVisual[defaultVisual]?.[0]?.value ??
+      '国漫'
+    textToDramaForm.setFieldsValue({
+      visual_style: defaultVisual,
+      style: defaultStyle,
+      episode_count: 3,
+      shots_per_episode: 6,
+      default_video_ratio: defaultVideoRatio ?? '9:16',
+      automation_mode: 'automatic',
+    })
+    setTextToDramaModalOpen(true)
+  }
+
+  const handleTextToDramaSubmit = async (values: {
+    source_text: string
+    project_name?: string
+    style: string
+    visual_style: ProjectVisualStyleChoice
+    episode_count: number
+    shots_per_episode: number
+    default_video_ratio?: string
+    automation_mode: 'automatic' | 'manual'
+  }) => {
+    setTextToDramaCreating(true)
+    try {
+      const data = await createTextToDrama({
+        source_text: values.source_text,
+        project_name: values.project_name || null,
+        style: values.style as ProjectStyle,
+        visual_style: values.visual_style as any,
+        episode_count: values.episode_count,
+        shots_per_episode: values.shots_per_episode,
+        default_video_ratio: values.default_video_ratio || '9:16',
+        automation_mode: values.automation_mode,
+      })
+      message.success(`已创建 ${data.chapters.length} 集、${data.created_shot_count} 个镜头种子`)
+      setTextToDramaModalOpen(false)
+      await load()
+      navigate(data.next_url)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '文本生成漫剧入口创建失败'
+      message.error(msg)
+    } finally {
+      setTextToDramaCreating(false)
+    }
   }
 
   const handleCreateSubmit = async (values: {
@@ -887,6 +944,9 @@ const ProjectLobby: React.FC = () => {
             <Button type="primary" size="small" className="text-[11px]" icon={<PlusOutlined />} onClick={handleOpenCreate}>
               新建项目
             </Button>
+            <Button size="small" className="text-[11px]" icon={<RocketOutlined />} onClick={handleOpenTextToDrama}>
+              文本生成漫剧
+            </Button>
             <Tooltip title={selectedProject ? '打开当前项目 Film Core Overview' : '选择或创建项目后查看 Film Core'}>
               <Button
                 size="small"
@@ -921,6 +981,9 @@ const ProjectLobby: React.FC = () => {
                             Film Core
                           </Button>
                         </Tooltip>
+                        <Button size="small" icon={<RocketOutlined />} onClick={handleOpenTextToDrama}>
+                          文本生成漫剧
+                        </Button>
                       </Space>
                     ) : null}
                   </div>
@@ -1065,6 +1128,77 @@ const ProjectLobby: React.FC = () => {
               <Button onClick={() => setCreateModalOpen(false)}>取消</Button>
               <Button type="primary" htmlType="submit">
                 创建并进入
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="从一段文字生成多集 AI 漫剧"
+        open={textToDramaModalOpen}
+        onCancel={() => setTextToDramaModalOpen(false)}
+        footer={null}
+        width={680}
+        destroyOnClose
+      >
+        <Form
+          form={textToDramaForm}
+          layout="vertical"
+          onFinish={handleTextToDramaSubmit}
+          initialValues={{
+            visual_style: projectStyleOptions.visualStyles[0]?.value ?? '动漫',
+            style:
+              projectStyleOptions.defaultStyleByVisual?.[projectStyleOptions.visualStyles[0]?.value ?? '动漫'] ??
+              projectStyleOptions.stylesByVisual[projectStyleOptions.visualStyles[0]?.value ?? '动漫']?.[0]?.value ??
+              '国漫',
+            episode_count: 3,
+            shots_per_episode: 6,
+            default_video_ratio: defaultVideoRatio ?? '9:16',
+            automation_mode: 'automatic',
+          }}
+        >
+          <Form.Item name="project_name" label="项目名称（选填）">
+            <Input placeholder="留空则使用文本首句" />
+          </Form.Item>
+          <Form.Item
+            name="source_text"
+            label="原始创意/梗概/正文"
+            rules={[{ required: true, message: '请输入一段文字' }]}
+          >
+            <Input.TextArea rows={8} placeholder="输入故事设定、人物关系、开端冲突或完整梗概" />
+          </Form.Item>
+          <ProjectVisualStyleAndStyleFields form={textToDramaForm} options={projectStyleOptions} />
+          <Row gutter={12}>
+            <Col xs={24} sm={8}>
+              <Form.Item name="episode_count" label="集数">
+                <InputNumber min={1} max={50} className="w-full" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item name="shots_per_episode" label="每集镜头">
+                <InputNumber min={1} max={30} className="w-full" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item name="default_video_ratio" label="默认视频比例">
+                <Select allowClear options={videoRatioOptions} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="automation_mode" label="流程开关">
+            <Select
+              options={[
+                { label: '自动推进', value: 'automatic' },
+                { label: '人工停等', value: 'manual' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item className="mb-0">
+            <Space>
+              <Button onClick={() => setTextToDramaModalOpen(false)}>取消</Button>
+              <Button type="primary" htmlType="submit" loading={textToDramaCreating}>
+                创建并进入 Film Core
               </Button>
             </Space>
           </Form.Item>

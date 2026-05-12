@@ -10,6 +10,7 @@ import type { ApiResponse_NoneType_ } from '../models/ApiResponse_NoneType_';
 import type { ApiResponse_PaginatedData_ModelRead__ } from '../models/ApiResponse_PaginatedData_ModelRead__';
 import type { ApiResponse_PaginatedData_ProviderRead__ } from '../models/ApiResponse_PaginatedData_ProviderRead__';
 import type { ApiResponse_ProviderRead_ } from '../models/ApiResponse_ProviderRead_';
+import type { ApiResponse_RuntimeModelConfigRead_ } from '../models/ApiResponse_RuntimeModelConfigRead_';
 import type { ApiResponse_VideoGenerationOptionsRead_ } from '../models/ApiResponse_VideoGenerationOptionsRead_';
 import type { ModelCategoryKey } from '../models/ModelCategoryKey';
 import type { ModelCreate } from '../models/ModelCreate';
@@ -341,6 +342,28 @@ export class LlmService {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/api/v1/llm/models/{model_id}',
+            path: {
+                'model_id': modelId,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * 获取模型运行时隔离适配层配置
+     * 返回模型调用需要的 provider/base_url/key 配置状态，但不回显密钥明文。
+     * @returns ApiResponse_RuntimeModelConfigRead_ Successful Response
+     * @throws ApiError
+     */
+    public static getRuntimeModelConfigApiV1LlmModelsModelIdRuntimeConfigGet({
+        modelId,
+    }: {
+        modelId: string,
+    }): CancelablePromise<ApiResponse_RuntimeModelConfigRead_> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/llm/models/{model_id}/runtime-config',
             path: {
                 'model_id': modelId,
             },

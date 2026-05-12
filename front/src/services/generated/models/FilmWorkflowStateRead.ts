@@ -19,4 +19,5 @@ export type FilmWorkflowStateRead = {
     last_task_id?: (string | null);
     edit_contract: Record<string, any>;
     regenerate_contract: Record<string, any>;
+    automation_contract: Record<string, any>;
 };

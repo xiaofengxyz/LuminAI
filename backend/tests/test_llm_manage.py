@@ -13,7 +13,9 @@ from app.services.llm.manage import (
     create_provider,
     get_image_generation_options,
     get_or_create_settings,
+    get_runtime_model_config,
     list_models_paginated,
+    list_supported_providers,
     update_model,
     update_model_settings,
 )
@@ -249,3 +251,46 @@ async def test_get_image_generation_options_uses_default_image_model_capability(
         assert options.ratio_size_profiles["9:16"]["standard"] == "1600x2848"
         assert options.ratio_size_profiles["21:9"]["high"] == "4704x2016"
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_runtime_model_config_isolates_generic_video_provider_base_url_and_key_state() -> None:
+    db, engine = await _build_session()
+    async with db:
+        await create_provider(
+            db,
+            body=ProviderCreate(
+                id="p-kling",
+                name="Kling",
+                base_url="https://gateway.example/kling",
+                video_base_url="https://video-gateway.example/kling",
+                api_key="sk-kling",
+            ),
+        )
+        await create_model(
+            db,
+            body=ModelCreate(
+                id="m-kling-video",
+                name="kling-v2",
+                category=ModelCategoryKey.video,
+                provider_id="p-kling",
+                params={"duration": 6},
+            ),
+        )
+
+        config = await get_runtime_model_config(db, model_id="m-kling-video")
+
+        assert config.provider_key == "kling"
+        assert config.base_url == "https://video-gateway.example/kling"
+        assert config.api_key_configured is True
+        assert config.isolated_adapter == "kling:video"
+        assert config.params == {"duration": 6}
+    await engine.dispose()
+
+
+def test_builtin_provider_registry_includes_cinematic_runtime_gateways() -> None:
+    video_keys = {item.key for item in list_supported_providers(category=ModelCategoryKey.video)}
+    image_keys = {item.key for item in list_supported_providers(category=ModelCategoryKey.image)}
+
+    assert {"kling", "seedance", "veo", "wan2_1", "sora", "vidu"}.issubset(video_keys)
+    assert {"comfyui", "flux", "sdxl", "storydiffusion"}.issubset(image_keys)

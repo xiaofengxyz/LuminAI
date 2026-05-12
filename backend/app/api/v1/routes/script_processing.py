@@ -68,6 +68,7 @@ from app.services.script_processing_tasks import (
     spawn_script_simplification_task,
     spawn_variant_task,
 )
+from app.services.script_processing_worker import build_rule_based_division_result
 from app.services.script_extraction_cache import (
     build_script_extract_cache_key,
     get_cached_script_extract,
@@ -147,7 +148,6 @@ async def divide_script_async(
 )
 async def divide_script(
     request: ScriptDividerRequest,
-    llm: BaseChatModel = Depends(get_nothinking_llm),
     db: AsyncSession = Depends(get_db),
 ) -> ApiResponse[ScriptDivisionResult]:
     """
@@ -162,9 +162,19 @@ async def divide_script(
     - notes: 拆分说明（可选）
     """
     try:
+        llm = await get_nothinking_llm(db)
         agent = ScriptDividerAgent(llm)
         result = agent.divide_script(script_text=request.script_text)
+    except HTTPException as exc:
+        if exc.status_code != status.HTTP_503_SERVICE_UNAVAILABLE:
+            raise
+        logger.warning("Script dividing fell back to deterministic splitter: %s", exc.detail)
+        result = build_rule_based_division_result(script_text=request.script_text)
+    except Exception as e:
+        logger.warning("Script dividing fell back to deterministic splitter: %s", e)
+        result = build_rule_based_division_result(script_text=request.script_text)
 
+    try:
         if request.write_to_db:
             if not request.chapter_id:
                 raise HTTPException(status_code=400, detail=required_field("chapter_id", when="write_to_db=true"))

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 from fastapi import HTTPException
@@ -24,6 +25,7 @@ from app.chains.agents.script_processing_agents import (
     ScriptDivisionResult,
     ScriptOptimizationResult,
     ScriptSimplificationResult,
+    ShotDivision,
 )
 from app.core.db_sync import sync_session_maker
 from app.services.script_extraction_cache import (
@@ -52,6 +54,22 @@ logger = logging.getLogger(__name__)
 
 class DivideResultGenerator(AbstractLLMResultGenerator):
     thinking = False
+
+    def generate(self, db: Session, run_args: dict[str, Any]) -> ScriptDivisionResult:
+        """Generate storyboard divisions, falling back to deterministic splitting.
+
+        Local operator runs may not have a text model configured yet.  The
+        fallback keeps the storyboard workflow usable and recoverable while
+        still allowing a real LLM to provide higher-quality divisions whenever
+        it is configured.
+        """
+
+        script_text = str(run_args.get("script_text") or "")
+        try:
+            return super().generate(db, run_args)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("script divide LLM path failed; using deterministic fallback: %s", exc)
+            return build_rule_based_division_result(script_text=script_text)
 
     def generate_with_llm(self, llm, run_args: dict[str, Any]) -> ScriptDivisionResult:
         agent = ScriptDividerAgent(llm)
@@ -255,9 +273,106 @@ def generate_division_result(
     db: Session,
     script_text: str,
 ) -> ScriptDivisionResult:
-    llm = build_default_text_llm_sync(db, thinking=False)
-    agent = ScriptDividerAgent(llm)
-    return agent.divide_script(script_text=script_text)
+    try:
+        llm = build_default_text_llm_sync(db, thinking=False)
+        agent = ScriptDividerAgent(llm)
+        return agent.divide_script(script_text=script_text)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("sync script division LLM path failed; using deterministic fallback: %s", exc)
+        return build_rule_based_division_result(script_text=script_text)
+
+
+def build_rule_based_division_result(*, script_text: str, target_chars: int = 180) -> ScriptDivisionResult:
+    """Create a stable non-LLM storyboard division from chapter text.
+
+    The splitter favors explicit line breaks and sentence punctuation, then
+    groups short beats so operators get useful shot seeds instead of a failed
+    task when model configuration is incomplete.
+    """
+
+    normalized = script_text.strip()
+    if not normalized:
+        return ScriptDivisionResult(shots=[], total_shots=0, notes="empty script")
+
+    line_items = [
+        (line_no, line.strip())
+        for line_no, line in enumerate(normalized.splitlines(), start=1)
+        if line.strip()
+    ]
+    if not line_items:
+        line_items = [(1, normalized)]
+
+    sentence_items: list[tuple[int, str]] = []
+    for line_no, text in line_items:
+        parts = [part.strip() for part in re.split(r"(?<=[。！？!?；;])\s*", text) if part.strip()]
+        if not parts:
+            parts = [text]
+        sentence_items.extend((line_no, part) for part in parts)
+
+    shots: list[ShotDivision] = []
+    current_parts: list[str] = []
+    start_line = sentence_items[0][0]
+    end_line = start_line
+
+    def flush_current() -> None:
+        """Append the current accumulated beat as one ShotDivision."""
+
+        if not current_parts:
+            return
+        excerpt = " ".join(current_parts).strip()
+        index = len(shots) + 1
+        shots.append(
+            ShotDivision(
+                index=index,
+                start_line=start_line,
+                end_line=end_line,
+                script_excerpt=excerpt,
+                shot_name=_rule_based_shot_name(excerpt, index),
+                time_of_day=_infer_time_of_day(excerpt),
+            )
+        )
+
+    for line_no, sentence in sentence_items:
+        current_len = sum(len(part) for part in current_parts)
+        should_flush = bool(current_parts) and (current_len + len(sentence) > target_chars)
+        if should_flush:
+            flush_current()
+            current_parts = []
+            start_line = line_no
+        if not current_parts:
+            start_line = line_no
+        current_parts.append(sentence)
+        end_line = line_no
+
+    flush_current()
+    return ScriptDivisionResult(
+        shots=shots,
+        total_shots=len(shots),
+        notes="deterministic fallback storyboard division; configure a text model for AI refinement",
+    )
+
+
+def _rule_based_shot_name(excerpt: str, index: int) -> str:
+    """Derive a compact title from the first action beat."""
+
+    compact = re.sub(r"\s+", "", excerpt)
+    title = compact[:18]
+    return title or f"镜头 {index}"
+
+
+def _infer_time_of_day(excerpt: str) -> str:
+    """Infer a loose time-of-day label from common Chinese/English markers."""
+
+    text = excerpt.lower()
+    if any(token in text for token in ("夜", "晚上", "深夜", "night")):
+        return "NIGHT"
+    if any(token in text for token in ("黎明", "清晨", "拂晓", "dawn")):
+        return "DAWN"
+    if any(token in text for token in ("黄昏", "傍晚", "dusk")):
+        return "DUSK"
+    if any(token in text for token in ("白天", "日间", "午后", "day")):
+        return "DAY"
+    return "UNKNOWN"
 
 
 def apply_division_result(

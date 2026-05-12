@@ -18,6 +18,7 @@ from app.schemas.llm import (
     ProviderCreate,
     ProviderRead,
     ProviderSupportedRead,
+    RuntimeModelConfigRead,
     VideoGenerationOptionsRead,
     ProviderUpdate,
 )
@@ -28,6 +29,7 @@ from app.services.llm.manage import (
     delete_provider as delete_provider_service,
     get_model as get_model_service,
     get_model_settings as get_model_settings_service,
+    get_runtime_model_config as get_runtime_model_config_service,
     get_provider as get_provider_service,
     get_image_generation_options as get_image_generation_options_service,
     get_video_generation_options as get_video_generation_options_service,
@@ -222,6 +224,20 @@ async def get_model(
 ) -> ApiResponse[ModelRead]:
     model = await get_model_service(db, model_id=model_id)
     return success_response(ModelRead.model_validate(model))
+
+
+@router.get(
+    "/models/{model_id}/runtime-config",
+    response_model=ApiResponse[RuntimeModelConfigRead],
+    summary="获取模型运行时隔离适配层配置",
+)
+async def get_runtime_model_config(
+    model_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[RuntimeModelConfigRead]:
+    """返回模型调用需要的 provider/base_url/key 配置状态，但不回显密钥明文。"""
+    data = await get_runtime_model_config_service(db, model_id=model_id)
+    return success_response(data)
 
 
 @router.patch(

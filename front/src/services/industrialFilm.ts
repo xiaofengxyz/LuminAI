@@ -9,8 +9,11 @@ import type {
   FilmIndustrialPlanRequest,
   FilmIndustrialRunRead,
   FilmIndustrialRunRequest,
+  FilmTextToDramaRead,
+  FilmTextToDramaRequest,
   FilmWorkflowMutationRead,
   FilmWorkflowRegenerateRequest,
+  FilmWorkflowStageCompleteRequest,
   FilmWorkflowStageRead,
   FilmWorkflowStatePatchRequest,
   FilmWorkflowStateRead,
@@ -40,10 +43,18 @@ export type FilmQueuedTask = FilmQueuedTaskRead
 export type FilmIndustrialOverview = FilmIndustrialOverviewRead
 export type FilmIndustrialPlan = FilmIndustrialPlanRead
 export type FilmIndustrialRun = FilmIndustrialRunRead
+export type FilmTextToDrama = FilmTextToDramaRead
 export type FilmWorkflowStage = FilmWorkflowStageRead
 export type FilmWorkflowState = FilmWorkflowStateRead
 export type FilmWorkflowMutation = FilmWorkflowMutationRead
-export type { FilmIndustrialPlanRequest, FilmIndustrialRunRequest, FilmWorkflowStatePatchRequest, FilmWorkflowRegenerateRequest }
+export type {
+  FilmIndustrialPlanRequest,
+  FilmIndustrialRunRequest,
+  FilmTextToDramaRequest,
+  FilmWorkflowStatePatchRequest,
+  FilmWorkflowRegenerateRequest,
+  FilmWorkflowStageCompleteRequest,
+}
 
 type FilmApiResponse<T> =
   {
@@ -61,6 +72,11 @@ function requireData<T>(response: FilmApiResponse<T>): T {
 export async function loadIndustrialOverview(projectId: string, chapterId?: string | null) {
   const response = await FilmService.loadIndustrialOverview({ projectId, chapterId })
   return requireData<FilmIndustrialOverview>(response)
+}
+
+export async function createTextToDrama(body: FilmTextToDramaRequest) {
+  const response = await FilmService.createTextToDrama({ requestBody: body })
+  return requireData<FilmTextToDrama>(response)
 }
 
 export async function loadWorkflowState(projectId: string, chapterId?: string | null) {
@@ -83,6 +99,15 @@ export async function regenerateWorkflowStage(
   body: FilmWorkflowRegenerateRequest,
 ) {
   const response = await FilmService.regenerateWorkflowStage({ projectId, stageKey, requestBody: body })
+  return requireData<FilmWorkflowMutation>(response)
+}
+
+export async function completeWorkflowStage(
+  projectId: string,
+  stageKey: string,
+  body: FilmWorkflowStageCompleteRequest,
+) {
+  const response = await FilmService.completeWorkflowStage({ projectId, stageKey, requestBody: body })
   return requireData<FilmWorkflowMutation>(response)
 }
 

@@ -12,7 +12,7 @@ from app.core.task_manager import DeliveryMode, SqlAlchemyTaskStore
 from app.core.task_manager.types import TaskStatus
 from app.models.task import GenerationTask, GenerationTaskStatus
 from app.models.task_links import GenerationTaskLink
-from app.services.script_processing_worker import run_extract_task_sync
+from app.services.script_processing_worker import build_rule_based_division_result, run_extract_task_sync
 from app.services.script_processing_tasks import (
     CHARACTER_PORTRAIT_ANALYSIS_RELATION_TYPE,
     CHAPTER_DIVISION_RELATION_TYPE,
@@ -41,6 +41,19 @@ from app.services.script_processing_tasks import (
     pick_merge_relation_entity_id,
     pick_variant_relation_entity_id,
 )
+
+
+def test_rule_based_script_division_keeps_storyboard_generation_recoverable() -> None:
+    result = build_rule_based_division_result(
+        script_text="雨夜，少女推开旧剧院大门。她发现舞台中央放着发光剧本。\n剧本翻页，城市记忆开始改写。",
+        target_chars=24,
+    )
+
+    assert result.total_shots >= 2
+    assert result.shots[0].index == 1
+    assert result.shots[0].start_line == 1
+    assert "旧剧院" in result.shots[0].script_excerpt
+    assert result.notes is not None and "fallback" in result.notes
 
 
 @pytest.mark.asyncio

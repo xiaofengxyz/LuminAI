@@ -131,6 +131,24 @@ class ModelRead(ModelBase):
     id: str = Field(..., description="模型 ID")
 
 
+class RuntimeModelConfigRead(BaseModel):
+    """模型调用时的隔离适配层配置视图（不回显密钥明文）。"""
+
+    model_id: str = Field(..., description="模型 ID")
+    model_name: str = Field(..., description="模型名称")
+    category: ModelCategoryKey = Field(..., description="模型类别")
+    provider_id: str = Field(..., description="供应商 ID")
+    provider_key: str = Field(..., description="供应商稳定键")
+    provider_display_name: str = Field(..., description="供应商展示名")
+    base_url: str | None = Field(None, description="按类别解析后的实际 Base URL")
+    api_key_required: bool = Field(True, description="该供应商是否要求 API Key")
+    api_key_configured: bool = Field(False, description="是否已配置 API Key")
+    api_secret_required: bool = Field(False, description="该供应商是否要求 API Secret")
+    api_secret_configured: bool = Field(False, description="是否已配置 API Secret")
+    isolated_adapter: str = Field(..., description="实际运行时适配器边界")
+    params: dict[str, Any] = Field(default_factory=dict, description="模型运行参数")
+
+
 class ModelSettingsBase(BaseModel):
     """模型全局设置通用字段。"""
 

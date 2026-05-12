@@ -8,9 +8,13 @@ from app.core.task_manager import DeliveryMode, SqlAlchemyTaskStore, TaskManager
 from app.dependencies import get_db
 from app.models.task_links import GenerationTaskLink
 from app.schemas.studio.shots import ShotVideoPromptPackRead
-from app.services.film.generated_video import build_run_args, preview_prompt_and_images
+from app.services.film.generated_video import (
+    build_run_args,
+    has_native_video_runtime_adapter,
+    preview_prompt_and_images,
+)
 from app.services.studio.shot_status import mark_shot_generating
-from app.tasks.execute_task import enqueue_task_execution
+from app.tasks.execute_task import enqueue_task_execution_best_effort, mark_task_external_runtime
 from app.schemas.common import ApiResponse, created_response, success_response
 
 from .common import TaskCreated, _CreateOnlyTask
@@ -89,5 +93,12 @@ async def create_video_generation_task(
     # 确保任务记录已提交，避免后台 runner 新 session 查询不到任务行而无法更新状态。
     await db.commit()
 
-    enqueue_task_execution(task_record.id)
+    provider = str(run_args.get("provider") or "openai")
+    if has_native_video_runtime_adapter(provider):
+        enqueue_task_execution_best_effort(task_record.id, inline_fallback=False)
+    else:
+        # External providers such as Kling/Vidu/Wan can be configured before a
+        # worker package exists.  Submit should still create a recoverable task
+        # ledger instead of failing synchronously in the Motion panel.
+        mark_task_external_runtime(task_record.id, provider=provider)
     return created_response(TaskCreated(task_id=task_record.id))

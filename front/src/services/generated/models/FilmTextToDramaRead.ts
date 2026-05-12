@@ -1,0 +1,17 @@
+/* generated using openapi-typescript-codegen -- do not edit */
+/* istanbul ignore file */
+/* tslint:disable */
+/* eslint-disable */
+import type { FilmChapterBriefRead } from './FilmChapterBriefRead';
+import type { FilmProjectBriefRead } from './FilmProjectBriefRead';
+import type { FilmQueuedTaskRead } from './FilmQueuedTaskRead';
+import type { FilmWorkflowStateRead } from './FilmWorkflowStateRead';
+export type FilmTextToDramaRead = {
+    project: FilmProjectBriefRead;
+    chapters: Array<FilmChapterBriefRead>;
+    created_shot_count: number;
+    workflow: FilmWorkflowStateRead;
+    tasks: Array<FilmQueuedTaskRead>;
+    next_url: string;
+    usage: Record<string, any>;
+};

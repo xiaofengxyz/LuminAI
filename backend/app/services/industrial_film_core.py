@@ -210,6 +210,7 @@ CINEFORGE_WORKFLOW_STAGES: list[dict[str, Any]] = [
         "editable": True,
         "regeneratable": True,
         "qa_gate": "graph_state_integrity",
+        "default_execution_mode": "automatic",
     },
     {
         "key": "novel_engine",
@@ -219,6 +220,7 @@ CINEFORGE_WORKFLOW_STAGES: list[dict[str, Any]] = [
         "editable": True,
         "regeneratable": True,
         "qa_gate": "story_continuity",
+        "default_execution_mode": "automatic",
     },
     {
         "key": "asset_pipeline",
@@ -228,6 +230,7 @@ CINEFORGE_WORKFLOW_STAGES: list[dict[str, Any]] = [
         "editable": True,
         "regeneratable": True,
         "qa_gate": "asset_consistency",
+        "default_execution_mode": "automatic",
     },
     {
         "key": "image_runtime",
@@ -237,6 +240,7 @@ CINEFORGE_WORKFLOW_STAGES: list[dict[str, Any]] = [
         "editable": True,
         "regeneratable": True,
         "qa_gate": "reference_image_quality",
+        "default_execution_mode": "automatic",
     },
     {
         "key": "video_runtime",
@@ -246,6 +250,7 @@ CINEFORGE_WORKFLOW_STAGES: list[dict[str, Any]] = [
         "editable": True,
         "regeneratable": True,
         "qa_gate": "shot_motion_quality",
+        "default_execution_mode": "automatic",
     },
     {
         "key": "qa_retry_engine",
@@ -255,6 +260,7 @@ CINEFORGE_WORKFLOW_STAGES: list[dict[str, Any]] = [
         "editable": True,
         "regeneratable": True,
         "qa_gate": "retry_patch_quality",
+        "default_execution_mode": "automatic",
     },
     {
         "key": "studio_ui",
@@ -264,6 +270,7 @@ CINEFORGE_WORKFLOW_STAGES: list[dict[str, Any]] = [
         "editable": True,
         "regeneratable": False,
         "qa_gate": "operator_surface_complete",
+        "default_execution_mode": "manual",
     },
     {
         "key": "data_schema",
@@ -273,6 +280,7 @@ CINEFORGE_WORKFLOW_STAGES: list[dict[str, Any]] = [
         "editable": True,
         "regeneratable": True,
         "qa_gate": "schema_contract_complete",
+        "default_execution_mode": "automatic",
     },
     {
         "key": "final_integration",
@@ -282,6 +290,7 @@ CINEFORGE_WORKFLOW_STAGES: list[dict[str, Any]] = [
         "editable": True,
         "regeneratable": True,
         "qa_gate": "end_to_end_executable",
+        "default_execution_mode": "automatic",
     },
 ]
 
@@ -495,9 +504,11 @@ def build_cineforge_workflow_state(
     stage_entries = []
     for stage in CINEFORGE_WORKFLOW_STAGES:
         key = str(stage["key"])
+        automation = _stage_automation(stage, merged_data.get(key, {}), merged_status.get(key, {}))
         stage_entries.append(
             {
                 **stage,
+                "automation": automation,
                 "status": merged_status.get(key, {}),
                 "data": merged_data.get(key, {}),
             }
@@ -532,6 +543,11 @@ def build_cineforge_workflow_state(
             "path": "/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/regenerate",
             "effect": "Creates a Jellyfish generation task for targeted regeneration without discarding approved stages.",
         },
+        "automation_contract": {
+            "mode_values": ["automatic", "manual"],
+            "automatic": "When a stage completes, the workflow records the result and marks the next stage active.",
+            "manual": "When a stage completes, the workflow records a waiting_operator gate and stops for user review.",
+        },
     }
 
 
@@ -544,13 +560,24 @@ def patch_cineforge_stage_data(
     actor: str,
     note: str,
     next_version: int,
+    execution_mode: str | None = None,
+    auto_advance: bool | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Apply an operator edit to one workflow stage without touching other stages."""
 
-    ensure_cineforge_stage(stage_key)
+    stage = ensure_cineforge_stage(stage_key)
     stage_data = deepcopy(current_stage_data)
     stage_status = deepcopy(current_stage_status)
     stage_data[stage_key] = _deep_merge(stage_data.get(stage_key, {}), patch)
+    automation = _stage_automation(stage, stage_data.get(stage_key, {}), stage_status.get(stage_key, {}))
+    if execution_mode is not None or auto_advance is not None:
+        automation = _automation_patch(
+            stage=stage,
+            current=automation,
+            execution_mode=execution_mode,
+            auto_advance=auto_advance,
+        )
+        stage_data[stage_key] = _deep_merge(stage_data.get(stage_key, {}), {"automation": automation})
     stage_status[stage_key] = _deep_merge(
         stage_status.get(stage_key, {}),
         {
@@ -558,6 +585,7 @@ def patch_cineforge_stage_data(
             "revision": next_version,
             "last_actor": actor,
             "last_note": note,
+            "automation": automation,
             "updated_at": _utc_now_iso(),
         },
     )
@@ -566,6 +594,7 @@ def patch_cineforge_stage_data(
         "actor": actor,
         "note": note,
         "patch": patch,
+        "automation": automation,
         "version": next_version,
         "created_at": _utc_now_iso(),
     }
@@ -586,6 +615,7 @@ def build_cineforge_regenerate_payload(
     """Create a task payload that can later be consumed by provider-specific workers."""
 
     stage = ensure_cineforge_stage(stage_key)
+    automation = _default_stage_automation(stage)
     return {
         "workflow_id": workflow_id,
         "workflow_key": "cineforge_ai_drama_os",
@@ -612,6 +642,7 @@ def build_cineforge_regenerate_payload(
             ),
         },
         "qa_gate": stage["qa_gate"],
+        "automation": automation,
     }
 
 
@@ -650,6 +681,84 @@ def mark_cineforge_regeneration_queued(
     return stage_status, entry
 
 
+def complete_cineforge_stage(
+    *,
+    current_stage_data: dict[str, Any],
+    current_stage_status: dict[str, Any],
+    stage_key: str,
+    task_id: str,
+    actor: str,
+    result: dict[str, Any],
+    next_version: int,
+    execution_mode: str | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Close one stage and either auto-activate the next stage or wait for the operator."""
+
+    stage = ensure_cineforge_stage(stage_key)
+    stage_data = deepcopy(current_stage_data)
+    stage_status = deepcopy(current_stage_status)
+    automation = _automation_patch(
+        stage=stage,
+        current=_stage_automation(stage, stage_data.get(stage_key, {}), stage_status.get(stage_key, {})),
+        execution_mode=execution_mode,
+        auto_advance=None,
+    )
+    is_auto = automation["mode"] == "automatic" and automation["auto_advance"]
+    next_stage_key = _next_cineforge_stage_key(stage_key)
+    next_state = "active" if is_auto and next_stage_key else None
+    current_state = "completed" if is_auto else "waiting_operator"
+
+    stage_data[stage_key] = _deep_merge(
+        stage_data.get(stage_key, {}),
+        {
+            "automation": automation,
+            "last_result": result,
+        },
+    )
+    stage_status[stage_key] = _deep_merge(
+        stage_status.get(stage_key, {}),
+        {
+            "state": current_state,
+            "revision": next_version,
+            "last_actor": actor,
+            "last_task_id": task_id,
+            "automation": automation,
+            "completed_at": _utc_now_iso(),
+        },
+    )
+    if next_stage_key and next_state:
+        next_stage = ensure_cineforge_stage(next_stage_key)
+        next_automation = _stage_automation(
+            next_stage,
+            stage_data.get(next_stage_key, {}),
+            stage_status.get(next_stage_key, {}),
+        )
+        stage_status[next_stage_key] = _deep_merge(
+            stage_status.get(next_stage_key, {}),
+            {
+                "state": next_state,
+                "revision": next_version,
+                "auto_started_by_stage": stage_key,
+                "auto_started_task_id": task_id,
+                "automation": next_automation,
+                "updated_at": _utc_now_iso(),
+            },
+        )
+
+    entry = {
+        "stage_key": stage_key,
+        "actor": actor,
+        "task_id": task_id,
+        "result": result,
+        "version": next_version,
+        "automation": automation,
+        "next_stage_key": next_stage_key,
+        "next_stage_state": next_state or "operator_halt",
+        "created_at": _utc_now_iso(),
+    }
+    return stage_data, stage_status, entry
+
+
 def ensure_cineforge_stage(stage_key: str) -> dict[str, Any]:
     """Return the workflow stage spec or raise a clear error for invalid keys."""
 
@@ -660,9 +769,76 @@ def ensure_cineforge_stage(stage_key: str) -> dict[str, Any]:
     raise KeyError(f"Unknown CineForge workflow stage '{stage_key}'. Valid stages: {valid}")
 
 
+def _default_stage_automation(stage: dict[str, Any]) -> dict[str, Any]:
+    mode = _normalize_execution_mode(str(stage.get("default_execution_mode") or "automatic"))
+    auto_advance = mode == "automatic"
+    return {
+        "mode": mode,
+        "auto_advance": auto_advance,
+        "stop_after_stage": not auto_advance,
+        "manual_allowed": True,
+        "next_stage_key": _next_cineforge_stage_key(str(stage["key"])),
+    }
+
+
+def _stage_automation(
+    stage: dict[str, Any],
+    stage_data: dict[str, Any],
+    stage_status: dict[str, Any],
+) -> dict[str, Any]:
+    base = _default_stage_automation(stage)
+    data_automation = stage_data.get("automation") if isinstance(stage_data, dict) else None
+    status_automation = stage_status.get("automation") if isinstance(stage_status, dict) else None
+    if isinstance(data_automation, dict):
+        base = _deep_merge(base, data_automation)
+    if isinstance(status_automation, dict):
+        base = _deep_merge(base, status_automation)
+    base["mode"] = _normalize_execution_mode(str(base.get("mode") or "automatic"))
+    base["auto_advance"] = bool(base.get("auto_advance")) and base["mode"] == "automatic"
+    base["stop_after_stage"] = not base["auto_advance"]
+    base["next_stage_key"] = _next_cineforge_stage_key(str(stage["key"]))
+    return base
+
+
+def _automation_patch(
+    *,
+    stage: dict[str, Any],
+    current: dict[str, Any],
+    execution_mode: str | None,
+    auto_advance: bool | None,
+) -> dict[str, Any]:
+    mode = _normalize_execution_mode(execution_mode or str(current.get("mode") or "automatic"))
+    should_auto_advance = mode == "automatic" if auto_advance is None else bool(auto_advance) and mode == "automatic"
+    return {
+        **current,
+        "mode": mode,
+        "auto_advance": should_auto_advance,
+        "stop_after_stage": not should_auto_advance,
+        "manual_allowed": True,
+        "next_stage_key": _next_cineforge_stage_key(str(stage["key"])),
+    }
+
+
+def _normalize_execution_mode(value: str) -> str:
+    mode = (value or "automatic").strip().lower()
+    if mode not in {"automatic", "manual"}:
+        raise ValueError("execution_mode must be 'automatic' or 'manual'")
+    return mode
+
+
+def _next_cineforge_stage_key(stage_key: str) -> str | None:
+    keys = [str(stage["key"]) for stage in CINEFORGE_WORKFLOW_STAGES]
+    try:
+        index = keys.index(stage_key)
+    except ValueError:
+        return None
+    next_index = index + 1
+    return keys[next_index] if next_index < len(keys) else None
+
+
 def _default_cineforge_stage_data(snapshot: IndustrialProjectSnapshot) -> dict[str, Any]:
     shot_refs = list(snapshot.shot_ids or snapshot.ready_shot_ids)
-    return {
+    data = {
         "workflow_architecture": {
             "graph_order": [str(stage["key"]) for stage in CINEFORGE_WORKFLOW_STAGES],
             "persistence": "cineforge_workflow_states",
@@ -772,6 +948,10 @@ def _default_cineforge_stage_data(snapshot: IndustrialProjectSnapshot) -> dict[s
             "export_policy": "approved clips are handed to post-production for subtitles, audio, transitions, and final delivery",
         },
     }
+    for stage in CINEFORGE_WORKFLOW_STAGES:
+        key = str(stage["key"])
+        data[key] = _deep_merge(data.get(key, {}), {"automation": _default_stage_automation(stage)})
+    return data
 
 
 def _default_cineforge_stage_status(snapshot: IndustrialProjectSnapshot) -> dict[str, Any]:

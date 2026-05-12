@@ -3039,7 +3039,7 @@ function Inspector(props: {
     const shotRatio = String(shotDetail?.override_video_ratio ?? '').trim()
     const projectRatio = String(projectDefaultVideoRatio ?? '').trim()
     const fallbackRatio = String(capabilityDefaultVideoRatio ?? '').trim()
-    return shotRatio || projectRatio || fallbackRatio
+    return shotRatio || projectRatio || fallbackRatio || '9:16'
   }, [capabilityDefaultVideoRatio, projectDefaultVideoRatio, shotDetail?.override_video_ratio])
   const resolvedKeyframeRatio = resolveVideoRatioForRequest()
   const resolvedKeyframePixelSize = resolveKeyframePixelSize(

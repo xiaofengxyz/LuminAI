@@ -2,8 +2,8 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { FilmWorkflowStateRead } from './FilmWorkflowStateRead';
-export type ApiResponse_FilmWorkflowStateRead_ = {
+import type { FilmTextToDramaRead } from './FilmTextToDramaRead';
+export type ApiResponse_FilmTextToDramaRead_ = {
     /**
      * 与 HTTP 状态码一致
      */
@@ -15,7 +15,7 @@ export type ApiResponse_FilmWorkflowStateRead_ = {
     /**
      * 实际数据
      */
-    data?: (FilmWorkflowStateRead | null);
+    data?: (FilmTextToDramaRead | null);
     /**
      * 附加元信息
      */

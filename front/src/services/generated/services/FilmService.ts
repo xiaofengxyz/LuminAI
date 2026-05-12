@@ -5,6 +5,7 @@
 import type { ApiResponse_FilmIndustrialOverviewRead_ } from '../models/ApiResponse_FilmIndustrialOverviewRead_';
 import type { ApiResponse_FilmIndustrialPlanRead_ } from '../models/ApiResponse_FilmIndustrialPlanRead_';
 import type { ApiResponse_FilmIndustrialRunRead_ } from '../models/ApiResponse_FilmIndustrialRunRead_';
+import type { ApiResponse_FilmTextToDramaRead_ } from '../models/ApiResponse_FilmTextToDramaRead_';
 import type { ApiResponse_FilmWorkflowMutationRead_ } from '../models/ApiResponse_FilmWorkflowMutationRead_';
 import type { ApiResponse_FilmWorkflowStateRead_ } from '../models/ApiResponse_FilmWorkflowStateRead_';
 import type { ApiResponse_GenerationTaskLinkRead_ } from '../models/ApiResponse_GenerationTaskLinkRead_';
@@ -19,7 +20,9 @@ import type { ApiResponse_TaskStatusRead_ } from '../models/ApiResponse_TaskStat
 import type { ApiResponse_VideoPromptPreviewResponse_ } from '../models/ApiResponse_VideoPromptPreviewResponse_';
 import type { FilmIndustrialPlanRequest } from '../models/FilmIndustrialPlanRequest';
 import type { FilmIndustrialRunRequest } from '../models/FilmIndustrialRunRequest';
+import type { FilmTextToDramaRequest } from '../models/FilmTextToDramaRequest';
 import type { FilmWorkflowRegenerateRequest } from '../models/FilmWorkflowRegenerateRequest';
+import type { FilmWorkflowStageCompleteRequest } from '../models/FilmWorkflowStageCompleteRequest';
 import type { FilmWorkflowStatePatchRequest } from '../models/FilmWorkflowStatePatchRequest';
 import type { GenerationTaskLinkCreate } from '../models/GenerationTaskLinkCreate';
 import type { GenerationTaskLinkUpdate } from '../models/GenerationTaskLinkUpdate';
@@ -57,6 +60,27 @@ export class FilmService {
             query: {
                 'chapter_id': chapterId,
             },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * 从一段文字创建多集 AI 漫剧生产入口
+     * Create a recoverable project/chapter/shot/workflow ledger from source text.
+     * @returns ApiResponse_FilmTextToDramaRead_ Successful Response
+     * @throws ApiError
+     */
+    public static createTextToDrama({
+        requestBody,
+    }: {
+        requestBody: FilmTextToDramaRequest,
+    }): CancelablePromise<ApiResponse_FilmTextToDramaRead_> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/film/industrial/text-to-drama',
+            body: requestBody,
+            mediaType: 'application/json',
             errors: {
                 422: `Validation Error`,
             },
@@ -139,6 +163,35 @@ export class FilmService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/regenerate',
+            path: {
+                'project_id': projectId,
+                'stage_key': stageKey,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * 完成 CineForge 工作流阶段并按开关推进
+     * Complete a stage; automatic stages activate the next stage, manual stages halt.
+     * @returns ApiResponse_FilmWorkflowMutationRead_ Successful Response
+     * @throws ApiError
+     */
+    public static completeWorkflowStage({
+        projectId,
+        stageKey,
+        requestBody,
+    }: {
+        projectId: string,
+        stageKey: string,
+        requestBody: FilmWorkflowStageCompleteRequest,
+    }): CancelablePromise<ApiResponse_FilmWorkflowMutationRead_> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/complete',
             path: {
                 'project_id': projectId,
                 'stage_key': stageKey,

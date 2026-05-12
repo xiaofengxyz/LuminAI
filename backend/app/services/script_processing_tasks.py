@@ -177,11 +177,20 @@ async def create_divide_task(
         relation_type=CHAPTER_DIVISION_RELATION_TYPE,
         relation_entity_id=chapter_id,
     )
-def spawn_divide_task(task_id: str) -> None:
-    """统一封装后台启动：第一阶段改为通用 Celery 执行入口。"""
-    from app.tasks.execute_task import enqueue_task_execution
 
-    enqueue_task_execution(task_id)
+
+def _spawn_celery_or_inline_task(task_id: str) -> None:
+    """Start a script-processing task with a local fallback for dev runs."""
+
+    from app.tasks.execute_task import enqueue_task_execution_best_effort
+
+    enqueue_task_execution_best_effort(task_id, inline_fallback=True)
+
+
+def spawn_divide_task(task_id: str) -> None:
+    """启动剧本分镜任务；本地无 Celery 时会退到后台线程执行。"""
+
+    _spawn_celery_or_inline_task(task_id)
 
 
 async def find_active_extract_task(
@@ -636,9 +645,9 @@ async def create_script_simplification_task(
 
 
 def spawn_extract_task(task_id: str) -> None:
-    from app.tasks.execute_task import enqueue_task_execution
+    """启动信息提取任务；本地无 Celery 时会退到后台线程执行。"""
 
-    enqueue_task_execution(task_id)
+    _spawn_celery_or_inline_task(task_id)
 
 
 async def run_merge_task(task_id: str) -> None:
@@ -689,10 +698,12 @@ async def run_merge_task(task_id: str) -> None:
 
 def spawn_merge_task(task_id: str) -> None:
     asyncio.create_task(run_merge_task(task_id))
-def spawn_consistency_task(task_id: str) -> None:
-    from app.tasks.execute_task import enqueue_task_execution
 
-    enqueue_task_execution(task_id)
+
+def spawn_consistency_task(task_id: str) -> None:
+    """启动一致性检查任务；本地无 Celery 时会退到后台线程执行。"""
+
+    _spawn_celery_or_inline_task(task_id)
 
 
 async def run_variant_task(task_id: str) -> None:
@@ -741,35 +752,39 @@ async def run_variant_task(task_id: str) -> None:
 
 def spawn_variant_task(task_id: str) -> None:
     asyncio.create_task(run_variant_task(task_id))
-def spawn_character_portrait_task(task_id: str) -> None:
-    from app.tasks.execute_task import enqueue_task_execution
 
-    enqueue_task_execution(task_id)
+
+def spawn_character_portrait_task(task_id: str) -> None:
+    """启动角色画像分析任务；本地无 Celery 时会退到后台线程执行。"""
+
+    _spawn_celery_or_inline_task(task_id)
 
 
 def spawn_prop_info_task(task_id: str) -> None:
-    from app.tasks.execute_task import enqueue_task_execution
+    """启动道具信息分析任务；本地无 Celery 时会退到后台线程执行。"""
 
-    enqueue_task_execution(task_id)
+    _spawn_celery_or_inline_task(task_id)
 
 
 def spawn_scene_info_task(task_id: str) -> None:
-    from app.tasks.execute_task import enqueue_task_execution
+    """启动场景信息分析任务；本地无 Celery 时会退到后台线程执行。"""
 
-    enqueue_task_execution(task_id)
+    _spawn_celery_or_inline_task(task_id)
 
 
 def spawn_costume_info_task(task_id: str) -> None:
-    from app.tasks.execute_task import enqueue_task_execution
+    """启动服装信息分析任务；本地无 Celery 时会退到后台线程执行。"""
 
-    enqueue_task_execution(task_id)
+    _spawn_celery_or_inline_task(task_id)
+
+
 def spawn_script_optimization_task(task_id: str) -> None:
-    from app.tasks.execute_task import enqueue_task_execution
+    """启动剧本优化任务；本地无 Celery 时会退到后台线程执行。"""
 
-    enqueue_task_execution(task_id)
+    _spawn_celery_or_inline_task(task_id)
 
 
 def spawn_script_simplification_task(task_id: str) -> None:
-    from app.tasks.execute_task import enqueue_task_execution
+    """启动剧本精简任务；本地无 Celery 时会退到后台线程执行。"""
 
-    enqueue_task_execution(task_id)
+    _spawn_celery_or_inline_task(task_id)

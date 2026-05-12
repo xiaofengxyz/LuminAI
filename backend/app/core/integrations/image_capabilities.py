@@ -45,6 +45,11 @@ def register_image_model_capability(
 
         register_openai_image_capability(model_prefix=model_prefix, capability=capability)
         return
+    if provider != "volcengine":
+        # Generic runtime gateways are configured in the provider registry.
+        # They use the default capability envelope until a worker contributes a
+        # provider-specific override.
+        return
     from app.core.integrations.volcengine.image_capabilities import register_volcengine_image_capability
 
     register_volcengine_image_capability(model_prefix=model_prefix, capability=capability)
@@ -62,6 +67,8 @@ def clear_image_model_capability_overrides(*, provider: ProviderKey | None = Non
     if provider == "openai":
         clear_openai_image_capability_overrides()
         return
+    if provider != "volcengine":
+        return
     clear_volcengine_image_capability_overrides()
 
 
@@ -70,6 +77,16 @@ def resolve_image_capability(*, provider: ProviderKey, model: str | None) -> Ima
         from app.core.integrations.openai.image_capabilities import resolve_openai_image_capability
 
         return resolve_openai_image_capability(model)
+    if provider != "volcengine":
+        return ImageModelCapability(
+            supports_seed=True,
+            supports_watermark=True,
+            supported_ratios=set(DEFAULT_VIDEO_REFERENCE_RATIO_SIZE_MAP.keys()),
+            ratio_size_profiles=DEFAULT_VIDEO_REFERENCE_RATIO_SIZE_MAP,
+            default_resolution_profile="standard",
+            min_n=1,
+            max_n=4,
+        )
     from app.core.integrations.volcengine.image_capabilities import resolve_volcengine_image_capability
 
     return resolve_volcengine_image_capability(model)

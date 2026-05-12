@@ -14,6 +14,7 @@ from app.core.task_manager.types import TaskStatus
 from app.core.contracts.provider import ProviderConfig
 from app.core.contracts.video_generation import VideoGenerationInput, VideoGenerationResult
 from app.core.tasks import VideoGenerationTask
+from app.core.tasks.registry import list_registered_task_adapters
 from app.models.llm import Model, ModelCategoryKey, ModelSettings
 from app.models.task_links import GenerationTaskLink
 from app.models.studio import FileItem, Shot, ShotDetail, ShotFrameType
@@ -32,6 +33,17 @@ from app.services.studio.shot_status import recompute_shot_status
 from app.services.worker.async_task_support import cancel_if_requested_async
 from app.services.worker.task_logging import log_task_event, log_task_failure
 from app.utils.files import create_file_from_url_or_b64
+
+
+def has_native_video_runtime_adapter(provider: str) -> bool:
+    """Return whether the in-process worker can execute this video provider."""
+
+    from app.bootstrap import bootstrap_all_registries
+
+    bootstrap_all_registries()
+    provider_key = (provider or "").strip().lower()
+    return ("video_generation", provider_key) in list_registered_task_adapters("video_generation")
+
 
 async def validate_shot_and_duration(db: AsyncSession, shot_id: str) -> ShotDetail:
     shot = await db.get(Shot, shot_id)

@@ -19,4 +19,12 @@ export type FilmWorkflowStatePatchRequest = {
      * 结构化阶段补丁
      */
     patch?: Record<string, any>;
+    /**
+     * 阶段执行开关；automatic 自动进入下一阶段，manual 阶段结束后停等人工
+     */
+    execution_mode?: ('automatic' | 'manual' | null);
+    /**
+     * automatic 模式下是否自动推进下一阶段
+     */
+    auto_advance?: (boolean | null);
 };

@@ -22,8 +22,14 @@ Direct URL -> /projects/{project_id}?tab=filmCore
 ## API Contract
 
 ```text
-GET  /api/v1/film/industrial/projects/{project_id}/overview
-POST /api/v1/film/industrial/projects/{project_id}/plan
+POST  /api/v1/film/industrial/text-to-drama
+GET   /api/v1/film/industrial/projects/{project_id}/overview
+GET   /api/v1/film/industrial/projects/{project_id}/workflow-state
+PATCH /api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}
+POST  /api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/regenerate
+POST  /api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/complete
+POST  /api/v1/film/industrial/projects/{project_id}/plan
+POST  /api/v1/film/industrial/projects/{project_id}/run
 ```
 
 前端通过 OpenAPI generated `FilmService` 调用接口，`front/src/services/industrialFilm.ts`
@@ -37,6 +43,24 @@ POST /api/v1/film/industrial/projects/{project_id}/plan
 - `implementation_phases`: Phase 1 到 Phase 9 的 owner、evidence 和代码/测试表面
 
 这些字段渲染为 `Film Core` tab 内的 `九阶段交付状态` 面板。
+
+## Text To Drama And Workflow Gates
+
+项目列表页提供 `文本生成漫剧` 入口。该入口把一段原始创意/梗概/正文写成：
+
+- Jellyfish Project
+- 多个 Chapter（按集数）
+- 每集 Shot seeds
+- `CineForgeWorkflowState`
+- `cineforge_text_to_drama_intake` / `cineforge_text_to_drama_auto_pipeline` 任务账本
+
+Film Core tab 内的 `CineForge 可编辑工作流状态` 面板当前支持：
+
+- 选择九个 Prompt-derived stage
+- 保存阶段编辑
+- 针对单阶段重生成
+- 设置 `automatic` / `manual`
+- 完成阶段并根据开关自动进入下一阶段或停在 `waiting_operator`
 
 ## Production Pipeline
 

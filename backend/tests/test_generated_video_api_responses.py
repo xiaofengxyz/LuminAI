@@ -141,7 +141,7 @@ def test_create_video_generation_task_returns_created_envelope(client: TestClien
 
     monkeypatch.setattr(route, "build_run_args", _fake_build_run_args)
     monkeypatch.setattr(route, "TaskManager", _FakeTaskManager)
-    monkeypatch.setattr(route, "enqueue_task_execution", lambda task_id: SimpleNamespace(id=f"celery-{task_id}"))
+    monkeypatch.setattr(route, "enqueue_task_execution_best_effort", lambda task_id, **_kwargs: SimpleNamespace(id=f"celery-{task_id}"))
     monkeypatch.setattr(route, "mark_shot_generating", _async_noop)
     app.dependency_overrides[get_db] = _override_db(db)
     try:
@@ -166,6 +166,46 @@ def test_create_video_generation_task_returns_created_envelope(client: TestClien
     assert body["meta"] is None
     assert db.committed is True
     assert len(db.added) == 1
+
+
+def test_create_video_generation_task_hands_external_provider_to_runtime_ledger(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    db = _FakeDB()
+    external: dict[str, str] = {}
+
+    async def _fake_build_run_args(*_args, **_kwargs):
+        return {"provider": "kling", "prompt": "最终视频提示词", "images": []}
+
+    def _fake_mark_external(task_id: str, *, provider: str) -> None:
+        external["task_id"] = task_id
+        external["provider"] = provider
+
+    monkeypatch.setattr(route, "build_run_args", _fake_build_run_args)
+    monkeypatch.setattr(route, "TaskManager", _FakeTaskManager)
+    monkeypatch.setattr(route, "has_native_video_runtime_adapter", lambda provider: False)
+    monkeypatch.setattr(route, "mark_task_external_runtime", _fake_mark_external)
+    monkeypatch.setattr(route, "mark_shot_generating", _async_noop)
+    app.dependency_overrides[get_db] = _override_db(db)
+    try:
+        response = client.post(
+            "/api/v1/film/tasks/video",
+            json={
+                "shot_id": "shot-1",
+                "reference_mode": "text_only",
+                "prompt": "生成一个可灵视频片段",
+                "images": [],
+                "ratio": "9:16",
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 201
+    assert response.json()["data"]["task_id"] == "video-task-1"
+    assert external == {"task_id": "video-task-1", "provider": "kling"}
+    assert db.committed is True
 
 
 def test_create_video_generation_task_validation_error_returns_api_response(client: TestClient) -> None:

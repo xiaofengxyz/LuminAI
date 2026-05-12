@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
-
-ProviderKey = Literal["openai", "volcengine"]
+# Provider keys are registry-owned strings, not a closed enum.  This keeps
+# runtime workers isolated from concrete vendors while still allowing built-in
+# adapters to special-case OpenAI or Volcengine where needed.
+ProviderKey = str
 
 
 @dataclass(frozen=True, slots=True)

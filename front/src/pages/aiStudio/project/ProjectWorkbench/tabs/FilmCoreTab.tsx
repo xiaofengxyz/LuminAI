@@ -13,6 +13,7 @@ import {
   Space,
   Spin,
   Statistic,
+  Switch,
   Tag,
   Timeline,
   Typography,
@@ -28,6 +29,7 @@ import {
 } from '@ant-design/icons'
 import { useParams } from 'react-router-dom'
 import {
+  completeWorkflowStage,
   createIndustrialRun,
   createIndustrialPlan,
   editWorkflowState,
@@ -50,7 +52,10 @@ const statusColor: Record<string, string> = {
   active: 'processing',
   warning: 'gold',
   waiting: 'default',
+  waiting_operator: 'gold',
+  needs_input: 'gold',
   blocked: 'red',
+  completed: 'green',
 }
 
 const statusLabel: Record<string, string> = {
@@ -59,7 +64,10 @@ const statusLabel: Record<string, string> = {
   active: '执行中',
   warning: '需补强',
   waiting: '等待中',
+  waiting_operator: '人工停等',
+  needs_input: '需输入',
   blocked: '阻塞',
+  completed: '已完成',
 }
 
 const severityColor: Record<string, string> = {
@@ -102,6 +110,7 @@ export function FilmCoreTab() {
   const [running, setRunning] = useState(false)
   const [savingWorkflow, setSavingWorkflow] = useState(false)
   const [regeneratingWorkflow, setRegeneratingWorkflow] = useState(false)
+  const [completingWorkflow, setCompletingWorkflow] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const blockingActions = useMemo(
@@ -161,6 +170,61 @@ export function FilmCoreTab() {
       message.error(msg)
     } finally {
       setSavingWorkflow(false)
+    }
+  }
+
+  const handleWorkflowModeChange = async (checked: boolean) => {
+    if (!projectId || !selectedWorkflowStage) return
+    const mode: 'automatic' | 'manual' = checked ? 'automatic' : 'manual'
+    setSavingWorkflow(true)
+    try {
+      const data = await editWorkflowState(projectId, selectedWorkflowStage.key, {
+        actor: 'studio_operator',
+        note: `set ${selectedWorkflowStage.key} execution mode to ${mode}`,
+        execution_mode: mode,
+        auto_advance: checked,
+        patch: {
+          automation: {
+            mode,
+            auto_advance: checked,
+            stop_after_stage: !checked,
+          },
+          ui_saved_at: new Date().toISOString(),
+        },
+      })
+      setWorkflow(data.workflow)
+      message.success(mode === 'automatic' ? '阶段已设为自动推进' : '阶段已设为人工停等')
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '阶段开关保存失败'
+      message.error(msg)
+    } finally {
+      setSavingWorkflow(false)
+    }
+  }
+
+  const handleWorkflowComplete = async () => {
+    if (!projectId || !selectedWorkflowStage) return
+    setCompletingWorkflow(true)
+    try {
+      const data = await completeWorkflowStage(projectId, selectedWorkflowStage.key, {
+        actor: 'studio_operator',
+        execution_mode: selectedWorkflowStage.automation.mode,
+        result: {
+          operator_note: workflowNote.trim(),
+          completed_from: 'film_core_ui',
+        },
+      })
+      setWorkflow(data.workflow)
+      message.success(
+        selectedWorkflowStage.automation.mode === 'automatic'
+          ? '阶段已完成并自动推进下一阶段'
+          : '阶段已完成，已停等人工操作',
+      )
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '阶段完成失败'
+      message.error(msg)
+    } finally {
+      setCompletingWorkflow(false)
     }
   }
 
@@ -385,6 +449,23 @@ export function FilmCoreTab() {
                     label: `${stage.title} · ${stage.status.state ?? 'unknown'}`,
                   }))}
                 />
+                <div className="flex items-center justify-between gap-3 rounded border border-gray-100 bg-gray-50 px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-gray-800">阶段推进开关</div>
+                    <div className="text-xs text-gray-500">
+                      {selectedWorkflowStage?.automation.mode === 'automatic'
+                        ? '完成后自动进入下一阶段'
+                        : '完成后停等人工审核或修改'}
+                    </div>
+                  </div>
+                  <Switch
+                    checked={selectedWorkflowStage?.automation.mode === 'automatic'}
+                    checkedChildren="自动"
+                    unCheckedChildren="人工"
+                    loading={savingWorkflow}
+                    onChange={handleWorkflowModeChange}
+                  />
+                </div>
                 <Input.TextArea
                   rows={4}
                   value={workflowNote}
@@ -407,6 +488,13 @@ export function FilmCoreTab() {
                     disabled={!selectedWorkflowStage?.regeneratable}
                   >
                     重生成阶段
+                  </Button>
+                  <Button
+                    icon={<CheckCircleOutlined />}
+                    onClick={handleWorkflowComplete}
+                    loading={completingWorkflow}
+                  >
+                    完成并推进
                   </Button>
                 </Space>
                 <Text type="secondary" className="text-xs">

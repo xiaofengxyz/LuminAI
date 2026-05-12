@@ -44,7 +44,11 @@ description: "如何在代码中注册内置供应商能力，并与异步任务
 - `image_generation` + `acme` → 指向 `ImageGenerationTask` 上对应的 `_build_acme_impl`（或等价工厂）。
 - `video_generation` + `acme` → 指向 `VideoGenerationTask` 上对应的工厂。
 
-工厂未注册时，任务分派会在运行时报错，与「能力表里有 key」不是一回事：**能力表只说明「产品层面支持」；任务表说明「 worker 能执行」**。
+工厂未注册时，与「能力表里有 key」不是一回事：**能力表只说明「产品层面支持」；任务表说明「worker 能执行」**。
+当前视频提交链路有一个产品侧容错：如果 Provider registry 认识该视频
+供应商，但 `video_generation` 还没有内置 worker 工厂，Motion/视频提交会
+创建 `GenerationTask` 并记录 `executor_type=external_runtime`，等待外部
+供应商 worker 接管；不会在提交按钮处同步失败。
 
 ### 3. 具体实现类
 
@@ -64,6 +68,9 @@ description: "如何在代码中注册内置供应商能力，并与异步任务
 
 - **内置注册表**：定义「系统认识哪些供应商 key、类别、默认 URL」，不替代数据库中的 `Provider` 实例（API Key、环境特定 base_url 等仍存 DB）。
 - **用户/运维在 UI 创建的 Provider**：通常应选用 `supported` 列表中的 key或与别名解析一致的名称，以便 `resolve_provider_key_from_name` 能落到统一 key；任务执行时再按 key 查找已注册的适配器。
+- **运行时配置视图**：`GET /api/v1/llm/models/{model_id}/runtime-config`
+  返回 provider key、类别 base URL、密钥是否已配置和隔离 adapter 名称，
+  不回显 `api_key` 或 `api_secret` 明文。
 
 ### Base URL 优先级（按类别解析）
 

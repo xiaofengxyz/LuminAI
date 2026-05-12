@@ -86,6 +86,8 @@ backend/app/services/studio/generation/
 - 项目级默认：`Project.default_video_ratio`
 - 分镜级覆盖：`ShotDetail.override_video_ratio`
 - 前端在提交视频任务时显式传入本次生效的 `ratio`
+- 若镜头级、项目级和模型 capability 都没有返回比例，分镜工作室使用
+  `9:16` 作为 Motion/视频提示词预览与提交兜底，避免空比例让操作中断
 - 后端直接使用请求中的 `ratio` 创建任务
 - 若某个供应商不直接支持 `ratio`，由 provider adapter 在执行层内部派生辅助 `size`
 - 前端比例枚举来自当前默认视频模型 capability 动态返回，不再使用静态常量
@@ -98,6 +100,14 @@ backend/app/services/studio/generation/
 - `action_beats` 由当前镜头剧本摘录、镜头描述与对白规则化提炼，用于降低“像静态画面说明”的问题
 - continuity 字段由相邻镜头摘要生成，用于降低镜头切换时的突兀感
 - `composition_anchor` 由景别、运镜、主场景、主角色与相邻镜头关系规则化生成，用于降低构图和轴线突变
+
+当前视频任务提交区分两种执行路径：
+
+- OpenAI / Volcengine 等已注册 worker 工厂的 provider，创建任务后进入
+  Celery/worker 执行链。
+- Kling / Vidu / Wan 等已在 Provider registry 中识别、但尚未绑定内置
+  worker 的 provider，提交时创建 `GenerationTask` 并标记
+  `executor_type=external_runtime`，等待外部 runtime worker 接管。
 - `screen_direction_guidance` 由机位角度、对白关系、相邻镜头场景连续性规则化生成，用于降低人物翻面与反打跳轴
 - 若视频模板未显式消费这些 guidance，系统会在模板渲染结果后自动补一段稳定的“镜头执行约束”，避免新字段只存在于 preview pack 中
 - 即便视频走手动 prompt 分支，系统当前也会追加同一层 guidance 补强，避免手动文本完全绕过镜头连续性与构图约束
