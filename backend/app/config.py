@@ -7,12 +7,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
-ENV_FILE = BACKEND_ROOT / ".env"
+REPO_ROOT = BACKEND_ROOT.parent.parent.parent
+ENV_FILES = (REPO_ROOT / ".env", BACKEND_ROOT / ".env")
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=str(ENV_FILE),
+        env_file=tuple(str(path) for path in ENV_FILES),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -39,7 +40,8 @@ class Settings(BaseSettings):
     # 也兼容 JSON 数组：'["http://a","http://b"]'
     cors_origins: str = (
         "http://localhost:7788,http://127.0.0.1:7788,"
-        "http://localhost:7790,http://127.0.0.1:7790"
+        "http://localhost:7790,http://127.0.0.1:7790,"
+        "http://localhost:24732,http://127.0.0.1:24732"
     )
     # 本地前端端口在冲突时会从 7788 漂移到 7790/其他端口；正则只放行本机开发源。
     cors_origin_regex: str | None = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
@@ -71,6 +73,56 @@ class Settings(BaseSettings):
     s3_base_path: str = ""
     # 可选：对外访问基址（CDN 或自定义域名），为空则使用 S3 自带 URL 或预签名 URL
     s3_public_base_url: str | None = None
+
+    # 阿里百炼 / DashScope 兼容 OpenAI 的文本模型默认配置。
+    # 多个变量名用于兼容历史 .env；密钥只用于后端调用，不在 API 中回显。
+    aliyun_bailian_api_key: str | None = None
+    bailian_api_key: str | None = None
+    dashscope_api_key: str | None = None
+    vite_api_key: str | None = None
+    aliyun_bailian_base_url: str | None = None
+    bailian_base_url: str | None = None
+    dashscope_base_url: str | None = None
+    aliyun_bailian_model: str | None = None
+    bailian_model: str | None = None
+    dashscope_model: str | None = None
+
+    @property
+    def bailian_resolved_api_key(self) -> str:
+        """按兼容优先级解析阿里百炼 API Key。"""
+        for value in (
+            self.aliyun_bailian_api_key,
+            self.bailian_api_key,
+            self.dashscope_api_key,
+            self.vite_api_key,
+        ):
+            if value and value.strip():
+                return value.strip()
+        return ""
+
+    @property
+    def bailian_resolved_base_url(self) -> str:
+        """解析阿里百炼 OpenAI-compatible Base URL。"""
+        for value in (
+            self.aliyun_bailian_base_url,
+            self.bailian_base_url,
+            self.dashscope_base_url,
+        ):
+            if value and value.strip():
+                return value.strip().rstrip("/")
+        return "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+    @property
+    def bailian_resolved_model_name(self) -> str:
+        """解析默认百炼文本模型名。"""
+        for value in (
+            self.aliyun_bailian_model,
+            self.bailian_model,
+            self.dashscope_model,
+        ):
+            if value and value.strip():
+                return value.strip()
+        return "qwen-plus"
 
     def model_post_init(self, __context: object) -> None:
         if not self.celery_broker_url or not str(self.celery_broker_url).strip():

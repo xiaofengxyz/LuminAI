@@ -26,16 +26,16 @@ def _cors_headers(origin: str) -> dict[str, str]:
 
 
 def test_backend_cors_allows_local_jellyfish_frontend_ports(client: TestClient) -> None:
-    assert "http://localhost:7790" in settings.cors_origins_list
+    assert "http://localhost:24732" in settings.cors_origins_list
     assert settings.cors_origin_regex_value is not None
 
     response = client.options(
         "/api/v1/studio/projects",
-        headers=_cors_headers("http://localhost:7790"),
+        headers=_cors_headers("http://localhost:24732"),
     )
 
     assert response.status_code == 200
-    assert response.headers["access-control-allow-origin"] == "http://localhost:7790"
+    assert response.headers["access-control-allow-origin"] == "http://localhost:24732"
     assert response.headers["access-control-allow-credentials"] == "true"
 
 
@@ -51,13 +51,13 @@ def test_reported_studio_projects_request_keeps_cors_header(
     try:
         response = client.get(
             "/api/v1/studio/projects",
-            headers={"Origin": "http://localhost:7790"},
+            headers={"Origin": "http://localhost:24732"},
         )
     finally:
         app.dependency_overrides.clear()
 
     assert response.status_code == 200
-    assert response.headers["access-control-allow-origin"] == "http://localhost:7790"
+    assert response.headers["access-control-allow-origin"] == "http://localhost:24732"
     assert response.json()["data"]["items"] == []
 
 
@@ -77,11 +77,11 @@ def test_reported_film_tasks_request_keeps_cors_header(
     try:
         response = client.get(
             "/api/v1/film/tasks?recent_seconds=15&page=1&page_size=50",
-            headers={"Origin": "http://localhost:7790"},
+            headers={"Origin": "http://localhost:24732"},
         )
     finally:
         app.dependency_overrides.clear()
 
     assert response.status_code == 200
-    assert response.headers["access-control-allow-origin"] == "http://localhost:7790"
+    assert response.headers["access-control-allow-origin"] == "http://localhost:24732"
     assert response.json()["data"]["items"] == []

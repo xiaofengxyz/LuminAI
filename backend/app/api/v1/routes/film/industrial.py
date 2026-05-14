@@ -103,6 +103,19 @@ class FilmPipelineStageRead(BaseModel):
     next_action: str
 
 
+class FilmProductionModuleRead(BaseModel):
+    key: str
+    title: str
+    status: str
+    progress: int
+    summary: str
+    tasks: list[str]
+    next_action: str
+    route_hint: str
+    can_return: bool
+    blockers: list[str]
+
+
 class FilmAssetHealthRead(BaseModel):
     identity_score: int
     scene_score: int
@@ -184,6 +197,7 @@ class FilmIndustrialOverviewRead(BaseModel):
     chapter: FilmChapterBriefRead | None = None
     industrial_score: int
     pipeline: list[FilmPipelineStageRead]
+    production_modules: list[FilmProductionModuleRead]
     asset_health: FilmAssetHealthRead
     qa_retry: FilmQaRetryRead
     pain_points: list[FilmPainPointRead]

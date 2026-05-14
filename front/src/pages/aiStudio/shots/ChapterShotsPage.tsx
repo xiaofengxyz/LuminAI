@@ -9,6 +9,7 @@ import {
   Layout,
   Modal,
   Popconfirm,
+  Progress,
   Segmented,
   Space,
   Table,
@@ -235,6 +236,7 @@ export function ChapterShotsPage() {
     }),
     [shotRuntimeMap, shots],
   )
+  const chapterDivisionProgress = chapterDivisionTask ? Math.max(chapterDivisionTask.progress ?? 0, 1) : 0
 
   const selectedShotIds = useMemo(() => selectedRowKeys.map((k) => String(k)), [selectedRowKeys])
 
@@ -681,6 +683,19 @@ export function ChapterShotsPage() {
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
             />
+            {chapterDivisionTask ? (
+              <div className="rounded border border-blue-100 bg-blue-50 px-3 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-blue-900">
+                    {chapterDivisionTask.cancelRequested ? '正在取消分镜提取' : '正在提取分镜'}
+                  </span>
+                  <Tag color={chapterDivisionTask.cancelRequested ? 'gold' : 'processing'}>
+                    {chapterDivisionTask.status}
+                  </Tag>
+                </div>
+                <Progress percent={chapterDivisionProgress} size="small" className="mt-1" />
+              </div>
+            ) : null}
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Segmented
                 size="small"

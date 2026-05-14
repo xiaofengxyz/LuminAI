@@ -1,4 +1,4 @@
-export const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8011'
+export const DEFAULT_BACKEND_URL = 'http://127.0.0.1:24731'
 
 declare global {
   interface Window {

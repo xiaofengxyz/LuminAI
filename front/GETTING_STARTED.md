@@ -83,7 +83,7 @@ src/
 
 ### 更新前端 OpenAPI 请求函数与类型
 
-后端开发服务启动后（LuminAI 本地默认 `http://127.0.0.1:8011`），在前端目录执行：
+后端开发服务启动后（LuminAI 本地默认 `http://127.0.0.1:24731`），在前端目录执行：
 
 ```bash
 pnpm run openapi:update
@@ -94,7 +94,7 @@ pnpm run openapi:update
 - `src/services/generated/`：生成的请求函数与类型定义
 - `openapi.json`：从后端拉取的 OpenAPI 文档缓存
 
-默认请求基础地址来自 `src/services/runtimeConfig.ts`，本地直连 `http://127.0.0.1:8011`；如需改回 Docker Compose 后端，可设置 `VITE_BACKEND_URL=http://127.0.0.1:8000` 或运行时 `BACKEND_URL`。
+默认请求基础地址来自 `src/services/runtimeConfig.ts`，本地直连 `http://127.0.0.1:24731`；如需改回 Docker Compose 后端，可设置 `VITE_BACKEND_URL=http://127.0.0.1:8000` 或运行时 `BACKEND_URL`。
 
 ### 创建新组件
 

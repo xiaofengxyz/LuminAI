@@ -6,13 +6,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:film-core": "vite --host 0.0.0.0 --port 7790",
+    "dev:film-core": "vite --host 0.0.0.0 --port 24732",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "preview": "vite preview",
-    "openapi:fetch": "BACKEND_URL=${VITE_BACKEND_URL:-http://127.0.0.1:8011}; NO_PROXY=localhost,127.0.0.1,::1 curl --noproxy '*' -sSf ${BACKEND_URL}/openapi.json -o ./openapi.json",
+    "openapi:fetch": "BACKEND_URL=${VITE_BACKEND_URL:-http://127.0.0.1:24731}; NO_PROXY=localhost,127.0.0.1,::1 curl --noproxy '*' -sSf ${BACKEND_URL}/openapi.json -o ./openapi.json",
     "openapi:gen": "pnpm exec -- openapi --input ./openapi.json --output ./src/services/generated --client fetch --useOptions --useUnionTypes",
     "openapi:update": "pnpm run openapi:fetch && pnpm run openapi:gen"
   },

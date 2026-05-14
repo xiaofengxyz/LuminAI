@@ -23,11 +23,12 @@ import {
   ApartmentOutlined,
   CheckCircleOutlined,
   ControlOutlined,
+  LinkOutlined,
   PlayCircleOutlined,
   ReloadOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   completeWorkflowStage,
   createIndustrialRun,
@@ -41,6 +42,7 @@ import {
   type FilmIndustrialRun,
   type FilmImplementationPhase,
   type FilmPipelineStage,
+  type FilmProductionModule,
   type FilmWorkflowState,
 } from '../../../../../services/industrialFilm'
 
@@ -70,6 +72,13 @@ const statusLabel: Record<string, string> = {
   completed: '已完成',
 }
 
+const moduleStatusLabel: Record<string, string> = {
+  done: '已完成',
+  active: '推进中',
+  waiting: '等待中',
+  blocked: '阻塞',
+}
+
 const severityColor: Record<string, string> = {
   high: 'red',
   medium: 'gold',
@@ -97,8 +106,36 @@ function phaseTag(phase: FilmImplementationPhase) {
   return <Tag color={phase.status === 'done' ? 'green' : 'gold'}>{phase.status === 'done' ? '已完成' : phase.status}</Tag>
 }
 
+/**
+ * 将后端模块状态映射为 Ant Design 颜色，保持 Film Core 进度视图稳定。
+ */
+function moduleStatusTag(module: FilmProductionModule) {
+  const color = module.status === 'done' ? 'green' : module.status === 'blocked' ? 'red' : module.status === 'active' ? 'processing' : 'default'
+  return <Tag color={color}>{moduleStatusLabel[module.status] ?? module.status}</Tag>
+}
+
+/**
+ * 根据模块 route_hint 给出项目内回跳地址，避免前端硬编码业务模块名称。
+ */
+function moduleRoute(projectId: string, module: FilmProductionModule) {
+  if (module.route_hint.includes('tab=chapters')) return `/projects/${projectId}?tab=chapters`
+  if (module.route_hint.includes('tab=roles')) return `/projects/${projectId}?tab=roles`
+  if (module.route_hint.includes('tab=settings')) return `/projects/${projectId}?tab=settings`
+  if (module.route_hint.includes('tab=edit')) return `/projects/${projectId}?tab=edit`
+  return `/projects/${projectId}?tab=filmCore`
+}
+
+/**
+ * 从工作流状态中读取角色网络参考采集候选，供 Film Core 以人工可审方式展示。
+ */
+function referenceHarvestItems(workflow: FilmWorkflowState | null): Array<Record<string, any>> {
+  const items = workflow?.stage_data?.image_runtime?.reference_harvest?.items
+  return Array.isArray(items) ? items.filter((item) => item && typeof item === 'object') : []
+}
+
 export function FilmCoreTab() {
   const { projectId } = useParams<{ projectId: string }>()
+  const navigate = useNavigate()
   const [overview, setOverview] = useState<FilmIndustrialOverview | null>(null)
   const [workflow, setWorkflow] = useState<FilmWorkflowState | null>(null)
   const [plan, setPlan] = useState<FilmIndustrialPlan | null>(null)
@@ -127,6 +164,7 @@ export function FilmCoreTab() {
     () => workflow?.stages.find((stage) => stage.key === selectedStageKey) ?? workflow?.stages[0],
     [workflow, selectedStageKey],
   )
+  const harvestItems = useMemo(() => referenceHarvestItems(workflow), [workflow])
 
   const refresh = async () => {
     if (!projectId) return
@@ -409,10 +447,92 @@ export function FilmCoreTab() {
         </Text>
       </Card>
 
-      <Card title="创建入口职责" size="small">
+      <Card title="AI漫剧生产进度" size="small">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          {overview.production_modules.map((module) => (
+            <div key={module.key} className="rounded border border-gray-100 bg-gray-50 px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-gray-900">{module.title}</span>
+                {moduleStatusTag(module)}
+              </div>
+              <Progress percent={module.progress} size="small" className="mt-2" />
+              <div className="mt-1 text-xs text-gray-600">{module.summary}</div>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {module.tasks.slice(0, 4).map((item) => (
+                  <Tag key={item} className="mr-0 text-[11px]">
+                    {item}
+                  </Tag>
+                ))}
+              </div>
+              {module.blockers.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {module.blockers.map((item) => (
+                    <Tag key={item} color="red" className="mr-0 text-[11px]">
+                      {item}
+                    </Tag>
+                  ))}
+                </div>
+              ) : null}
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <Text type="secondary" className="text-xs">
+                  {module.next_action}
+                </Text>
+                <Button
+                  size="small"
+                  type="link"
+                  icon={<LinkOutlined />}
+                  disabled={!module.can_return}
+                  onClick={() => projectId && navigate(moduleRoute(projectId, module))}
+                >
+                  返回修改
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {harvestItems.length > 0 ? (
+        <Card title="角色网络参考采集" size="small">
+          <Row gutter={[12, 12]}>
+            {harvestItems.slice(0, 6).map((item) => {
+              const characterName = String(item.character_name ?? item.character_key ?? '角色')
+              const imageUrls = Array.isArray(item.image_search_urls) ? item.image_search_urls : []
+              const videoUrls = Array.isArray(item.video_search_urls) ? item.video_search_urls : []
+              return (
+                <Col xs={24} md={12} xl={8} key={String(item.character_key ?? characterName)}>
+                  <div className="h-full rounded border border-gray-100 bg-gray-50 px-3 py-2">
+                    <div className="font-medium text-gray-900">{characterName}</div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {imageUrls.slice(0, 2).map((url: string, index: number) => (
+                        <a key={`image-${url}`} href={url} target="_blank" rel="noreferrer">
+                          图片候选 {index + 1}
+                        </a>
+                      ))}
+                      {videoUrls.slice(0, 2).map((url: string, index: number) => (
+                        <a key={`video-${url}`} href={url} target="_blank" rel="noreferrer">
+                          视频候选 {index + 1}
+                        </a>
+                      ))}
+                    </div>
+                    <div className="mt-2 text-xs text-gray-500">
+                      {Array.isArray(item.image_queries) ? item.image_queries[0] : ''}
+                    </div>
+                  </div>
+                </Col>
+              )
+            })}
+          </Row>
+          <div className="mt-3 text-xs text-gray-500">
+            参考采集只保存候选搜索入口与授权核查线索，实际下载和商用使用需要后续 worker 或人工确认版权。
+          </div>
+        </Card>
+      ) : null}
+
+      <Card title="统一入口职责" size="small">
         <Row gutter={[12, 12]}>
           {overview.creation_entries.map((entry) => (
-            <Col xs={24} md={8} key={entry.key}>
+            <Col xs={24} md={12} key={entry.key}>
               <div className="h-full rounded border border-gray-100 bg-gray-50 px-3 py-2">
                 <div className="font-medium text-gray-900">{entry.title}</div>
                 <div className="mt-1 text-xs text-gray-600">{entry.purpose}</div>

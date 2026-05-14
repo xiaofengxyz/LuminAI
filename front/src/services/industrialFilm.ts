@@ -22,6 +22,7 @@ import type {
   FilmPainPointRead,
   FilmPipelineStageRead,
   FilmProjectBriefRead,
+  FilmProductionModuleRead,
   FilmQaRetryRead,
   FilmQueuedTaskRead,
   FilmReferenceProjectRead,
@@ -32,6 +33,7 @@ import type {
 export type FilmProjectBrief = FilmProjectBriefRead
 export type FilmChapterBrief = NonNullable<FilmIndustrialOverviewRead['chapter']>
 export type FilmPipelineStage = FilmPipelineStageRead
+export type FilmProductionModule = FilmProductionModuleRead
 export type FilmAssetHealth = FilmAssetHealthRead
 export type FilmQaRetry = FilmQaRetryRead
 export type FilmPainPoint = FilmPainPointRead

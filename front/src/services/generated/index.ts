@@ -132,6 +132,7 @@ export type { FilmNextActionRead } from './models/FilmNextActionRead';
 export type { FilmPainPointRead } from './models/FilmPainPointRead';
 export type { FilmPipelineStageRead } from './models/FilmPipelineStageRead';
 export type { FilmPostProductionRead } from './models/FilmPostProductionRead';
+export type { FilmProductionModuleRead } from './models/FilmProductionModuleRead';
 export type { FilmProjectBriefRead } from './models/FilmProjectBriefRead';
 export type { FilmQaPolicyRead } from './models/FilmQaPolicyRead';
 export type { FilmQaRetryRead } from './models/FilmQaRetryRead';

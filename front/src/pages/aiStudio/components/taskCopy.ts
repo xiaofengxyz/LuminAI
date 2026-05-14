@@ -157,6 +157,13 @@ export const TASK_COPY = {
 } satisfies Record<string, TaskCopyPreset>
 
 export const TASK_KIND_TITLE_MAP: Record<string, string> = {
+  cineforge_text_to_drama_intake: 'AI漫剧创建',
+  cineforge_text_to_drama_auto_pipeline: 'AI漫剧自动流程',
+  cineforge_reference_harvest: '角色网络参考采集',
+  cineforge_workflow_edit: '工作流阶段编辑',
+  cineforge_stage_regenerate: '工作流阶段重生成',
+  cineforge_stage_auto_advance: '工作流自动推进',
+  cineforge_stage_manual_gate: '工作流人工门禁',
   script_divide: TASK_COPY.chapterDivision.title,
   script_extract: TASK_COPY.scriptExtract.title,
   script_consistency: TASK_COPY.consistencyCheck.title,
@@ -191,6 +198,7 @@ export const RELATION_TYPE_LABEL_MAP: Record<string, string> = {
   costume_image: '服装图片',
   character_image: '角色图片',
   shot_frame_image: '分镜图片',
+  cineforge_workflow_stage: 'CineForge 工作流',
 }
 
 export function resolveTaskTitle(taskKind?: string | null): string {

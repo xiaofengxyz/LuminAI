@@ -10,6 +10,7 @@ import type { FilmImplementationStatusRead } from './FilmImplementationStatusRea
 import type { FilmNextActionRead } from './FilmNextActionRead';
 import type { FilmPainPointRead } from './FilmPainPointRead';
 import type { FilmPipelineStageRead } from './FilmPipelineStageRead';
+import type { FilmProductionModuleRead } from './FilmProductionModuleRead';
 import type { FilmProjectBriefRead } from './FilmProjectBriefRead';
 import type { FilmQaRetryRead } from './FilmQaRetryRead';
 import type { FilmReferenceProjectRead } from './FilmReferenceProjectRead';
@@ -20,6 +21,7 @@ export type FilmIndustrialOverviewRead = {
     chapter?: (FilmChapterBriefRead | null);
     industrial_score: number;
     pipeline: Array<FilmPipelineStageRead>;
+    production_modules: Array<FilmProductionModuleRead>;
     asset_health: FilmAssetHealthRead;
     qa_retry: FilmQaRetryRead;
     pain_points: Array<FilmPainPointRead>;

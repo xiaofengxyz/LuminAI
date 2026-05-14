@@ -6,8 +6,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.db import Base
+from app.config import settings
 from app.models.llm import LogLevel, Model, ModelCategoryKey, ModelSettings, Provider
 from app.schemas.llm import ModelCreate, ModelSettingsUpdate, ModelUpdate, ProviderCreate
+from app.services.llm.env_bootstrap import BAILIAN_MODEL_ID, BAILIAN_PROVIDER_ID, ensure_bailian_default_text_model
 from app.services.llm.manage import (
     create_model,
     create_provider,
@@ -285,6 +287,38 @@ async def test_runtime_model_config_isolates_generic_video_provider_base_url_and
         assert config.api_key_configured is True
         assert config.isolated_adapter == "kling:video"
         assert config.params == {"duration": 6}
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_env_bootstrap_configures_bailian_as_default_text_model(monkeypatch) -> None:
+    db, engine = await _build_session()
+    monkeypatch.setattr(settings, "aliyun_bailian_api_key", None)
+    monkeypatch.setattr(settings, "bailian_api_key", "sk-test-bailian")
+    monkeypatch.setattr(settings, "dashscope_api_key", None)
+    monkeypatch.setattr(settings, "vite_api_key", None)
+    monkeypatch.setattr(settings, "bailian_model", "qwen-max")
+    monkeypatch.setattr(settings, "aliyun_bailian_model", None)
+    monkeypatch.setattr(settings, "dashscope_model", None)
+    monkeypatch.setattr(settings, "bailian_base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    async with db:
+        bootstrapped = await ensure_bailian_default_text_model(db)
+        await db.commit()
+
+        provider = await db.get(Provider, BAILIAN_PROVIDER_ID)
+        model = await db.get(Model, BAILIAN_MODEL_ID)
+        model_settings = await db.get(ModelSettings, 1)
+        runtime_config = await get_runtime_model_config(db, model_id=BAILIAN_MODEL_ID)
+
+        assert bootstrapped is True
+        assert provider is not None
+        assert provider.api_key == "sk-test-bailian"
+        assert model is not None
+        assert model.name == "qwen-max"
+        assert model_settings is not None
+        assert model_settings.default_text_model_id == BAILIAN_MODEL_ID
+        assert runtime_config.provider_key == "aliyun_bailian"
+        assert runtime_config.api_key_configured is True
     await engine.dispose()
 
 

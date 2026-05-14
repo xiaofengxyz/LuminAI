@@ -160,6 +160,11 @@ async def create_divide_task(
         task_kind=SCRIPT_DIVIDE_TASK_KIND,
         run_args=run_args,
     )
+    # A queued storyboard task should never look frozen at 0% in the UI.  The
+    # worker raises this to the running/result/succeeded milestones once it
+    # starts, but the initial 1% gives operators immediate feedback.
+    await store.set_progress(task_record.id, 1)
+    task_record.progress = 1
     db.add(
         GenerationTaskLink(
             task_id=task_record.id,

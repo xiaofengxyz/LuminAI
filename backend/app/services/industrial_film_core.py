@@ -380,6 +380,7 @@ def build_industrial_overview(snapshot: IndustrialProjectSnapshot) -> dict[str, 
         else None,
         "industrial_score": _industrial_score(snapshot),
         "pipeline": stages,
+        "production_modules": _build_production_modules(snapshot),
         "asset_health": asset_health,
         "qa_retry": qa_retry,
         "pain_points": pain_points,
@@ -1044,6 +1045,218 @@ def _stage(
     }
 
 
+def _module(
+    key: str,
+    *,
+    title: str,
+    status: str,
+    progress: int,
+    summary: str,
+    tasks: list[str],
+    next_action: str,
+    route_hint: str,
+    can_return: bool = True,
+    blockers: list[str] | None = None,
+) -> dict[str, Any]:
+    """Build one operator-facing production module progress item.
+
+    The Film Core pipeline answers "what runtime layer owns this work"; this
+    module list answers "what should the producer do next, and where can they
+    return to edit it". Keeping the two views separate makes the UI more
+    actionable without weakening the existing runtime abstraction.
+    """
+
+    return {
+        "key": key,
+        "title": title,
+        "status": status,
+        "progress": max(0, min(100, progress)),
+        "summary": summary,
+        "tasks": tasks,
+        "next_action": next_action,
+        "route_hint": route_hint,
+        "can_return": can_return,
+        "blockers": blockers or [],
+    }
+
+
+def _status_from_progress(progress: int, *, blocked: bool = False) -> str:
+    """Normalize module progress into a compact UI status value."""
+
+    if blocked:
+        return "blocked"
+    if progress >= 100:
+        return "done"
+    if progress > 0:
+        return "active"
+    return "waiting"
+
+
+def _build_production_modules(snapshot: IndustrialProjectSnapshot) -> list[dict[str, Any]]:
+    """Build module-level progress from project intake to final editing.
+
+    The percentages are derived only from structured Jellyfish state. They do
+    not pretend that a provider worker has rendered media; they show the
+    recoverable production readiness of each module.
+    """
+
+    story_progress = 100 if snapshot.has_script else 0
+    episode_progress = 100 if snapshot.chapter_count > 0 and snapshot.has_script else (40 if snapshot.chapter_count > 0 else 0)
+    asset_health = _build_asset_health(snapshot)
+    asset_progress = round(
+        (
+            asset_health["identity_score"]
+            + asset_health["scene_score"]
+            + asset_health["prop_score"]
+            + asset_health["costume_score"]
+        )
+        / 4
+    )
+    reference_progress = 0
+    if snapshot.character_count > 0:
+        reference_progress = 80 if snapshot.actor_link_count >= snapshot.character_count else 55
+    storyboard_progress = 100 if snapshot.shot_count > 0 else (30 if snapshot.has_script else 0)
+    shot_ready_progress = _ratio(snapshot.ready_shot_count, max(snapshot.shot_count, 1)) if snapshot.shot_count else 0
+    render_progress = _ratio(
+        snapshot.generated_video_count + snapshot.accepted_video_task_count,
+        max(snapshot.ready_shot_count, 1),
+    ) if snapshot.ready_shot_count else 0
+    qa_progress = 100 if snapshot.generated_video_count + snapshot.accepted_video_task_count > 0 else 0
+    final_progress = 100 if qa_progress == 100 and snapshot.generated_video_count > 0 else 0
+
+    return [
+        _module(
+            "project_intake",
+            title="项目创建",
+            status="done",
+            progress=100,
+            summary=f"{snapshot.project_name} · {snapshot.project_style} · {snapshot.visual_style}",
+            tasks=["确认片名与风格", "固定全局 seed", "设置默认画幅"],
+            next_action="继续进入小说/剧本模块。",
+            route_hint=f"/projects/{snapshot.project_id}?tab=settings",
+        ),
+        _module(
+            "novel_script",
+            title="小说 / 剧本",
+            status=_status_from_progress(story_progress, blocked=not snapshot.has_script),
+            progress=story_progress,
+            summary=f"原文 {snapshot.script_text_length} 字，精简文本 {snapshot.condensed_text_length} 字",
+            tasks=["输入一句话、段落或小说正文", "扩展为小说稿", "沉淀每集脚本线索"],
+            next_action="补齐章节原文。" if not snapshot.has_script else "复核故事主线与悬念。",
+            route_hint=f"/projects/{snapshot.project_id}?tab=chapters",
+            blockers=[] if snapshot.has_script else ["缺少章节原文或精简文本"],
+        ),
+        _module(
+            "episode_breakdown",
+            title="分集拆解",
+            status=_status_from_progress(episode_progress, blocked=snapshot.chapter_count == 0),
+            progress=episode_progress,
+            summary=f"章节/集数 {snapshot.chapter_count}",
+            tasks=["确认集数", "确认每集摘要", "确认上下集悬念承接"],
+            next_action="创建或检查分集章节。" if snapshot.chapter_count == 0 else "进入分镜提取。",
+            route_hint=f"/projects/{snapshot.project_id}?tab=chapters",
+            blockers=[] if snapshot.chapter_count > 0 else ["缺少分集章节"],
+        ),
+        _module(
+            "asset_bible",
+            title="角色 / 服装 / 道具 / 场景 / 视效",
+            status=_status_from_progress(asset_progress, blocked=not snapshot.has_asset_bible),
+            progress=asset_progress,
+            summary=(
+                f"角色 {snapshot.character_count}，演员绑定 {snapshot.actor_link_count}，"
+                f"服装 {snapshot.costume_link_count}，道具 {snapshot.prop_link_count}，场景 {snapshot.scene_link_count}"
+            ),
+            tasks=["提取角色", "提取服装", "提取道具", "提取场景", "提取视效规则"],
+            next_action="补齐资产圣经绑定。" if not snapshot.has_asset_bible else "锁定资产版本。",
+            route_hint=f"/projects/{snapshot.project_id}?tab=roles",
+            blockers=[] if snapshot.has_asset_bible else _asset_bible_blockers(snapshot),
+        ),
+        _module(
+            "reference_harvest",
+            title="角色网络图片 / 视频参考",
+            status=_status_from_progress(reference_progress, blocked=snapshot.character_count == 0),
+            progress=reference_progress,
+            summary=f"角色 {snapshot.character_count}，身份参考绑定 {snapshot.actor_link_count}",
+            tasks=["生成图片搜索词", "生成视频搜索词", "保留候选 URL", "记录授权核查策略"],
+            next_action="查看参考采集候选并人工筛选授权素材。",
+            route_hint=f"/projects/{snapshot.project_id}?tab=filmCore",
+            blockers=[] if snapshot.character_count > 0 else ["需要先生成角色"],
+        ),
+        _module(
+            "storyboard_graph",
+            title="分镜 / Shot Graph",
+            status=_status_from_progress(storyboard_progress, blocked=not snapshot.has_story_graph),
+            progress=storyboard_progress,
+            summary=f"镜头 {snapshot.shot_count}，镜头细节 {snapshot.detail_count}",
+            tasks=["提取分镜", "确认镜头顺序", "补齐动作拍点", "补齐景别机位运镜"],
+            next_action="运行分镜提取。" if not snapshot.has_story_graph else "检查镜头连续性。",
+            route_hint=f"/projects/{snapshot.project_id}?tab=chapters",
+            blockers=[] if snapshot.has_story_graph else ["缺少分镜图谱"],
+        ),
+        _module(
+            "shot_preparation",
+            title="镜头准备",
+            status=_status_from_progress(shot_ready_progress, blocked=snapshot.shot_count == 0),
+            progress=shot_ready_progress,
+            summary=f"ready 镜头 {snapshot.ready_shot_count}/{snapshot.shot_count}",
+            tasks=["确认角色资产候选", "确认对白", "补关键帧", "检查视频准备度"],
+            next_action="把待确认镜头推进到 ready。" if shot_ready_progress < 100 else "进入批量渲染计划。",
+            route_hint=f"/projects/{snapshot.project_id}?tab=chapters",
+            blockers=[] if snapshot.ready_shot_count > 0 else ["没有 ready 状态镜头"],
+        ),
+        _module(
+            "render_runtime",
+            title="图片 / 视频生成",
+            status=_status_from_progress(render_progress, blocked=snapshot.ready_shot_count == 0),
+            progress=render_progress,
+            summary=f"已生成/已采用视频 {snapshot.generated_video_count + snapshot.accepted_video_task_count}/{snapshot.ready_shot_count}",
+            tasks=["生成闭环计划", "创建生产任务", "跟踪任务中心", "写回镜头产物"],
+            next_action="创建生产任务。" if snapshot.ready_shot_count > 0 else "先完成镜头准备。",
+            route_hint=f"/projects/{snapshot.project_id}?tab=filmCore",
+            blockers=[] if snapshot.ready_shot_count > 0 else ["拍摄门禁未通过"],
+        ),
+        _module(
+            "qa_retry",
+            title="自动 QA / Retry",
+            status=_status_from_progress(qa_progress, blocked=render_progress == 0),
+            progress=qa_progress,
+            summary=f"QA 输入 {snapshot.generated_video_count + snapshot.accepted_video_task_count}",
+            tasks=["检查身份漂移", "检查服装道具", "检查镜头连续性", "生成失败镜头修复补丁"],
+            next_action="等待视频产物后运行 QA。" if qa_progress == 0 else "只重试失败镜头。",
+            route_hint=f"/projects/{snapshot.project_id}?tab=filmCore",
+            blockers=[] if qa_progress > 0 else ["缺少可 QA 视频"],
+        ),
+        _module(
+            "final_editing",
+            title="后期 / 成片输出",
+            status=_status_from_progress(final_progress, blocked=qa_progress == 0),
+            progress=final_progress,
+            summary="字幕、TTS、BGM、转场和最终导出由后期计划承接",
+            tasks=["整理通过 QA 的镜头", "合成字幕和 TTS", "拼接转场", "导出多集成片"],
+            next_action="进入剪辑工作台。",
+            route_hint=f"/projects/{snapshot.project_id}?tab=edit",
+            blockers=[] if final_progress > 0 else ["至少需要一个已生成视频"],
+        ),
+    ]
+
+
+def _asset_bible_blockers(snapshot: IndustrialProjectSnapshot) -> list[str]:
+    """List missing asset-bible prerequisites for the module progress view."""
+
+    blockers: list[str] = []
+    if snapshot.character_count <= 0:
+        blockers.append("缺少角色")
+    if snapshot.actor_link_count < max(snapshot.character_count, 1):
+        blockers.append("缺少演员/身份参考绑定")
+    if snapshot.costume_link_count <= 0:
+        blockers.append("缺少服装")
+    if snapshot.prop_link_count <= 0:
+        blockers.append("缺少道具")
+    if snapshot.scene_link_count <= 0:
+        blockers.append("缺少场景")
+    return blockers
+
+
 def _shot_ref(snapshot: IndustrialProjectSnapshot, index: int) -> str:
     if 1 <= index <= len(snapshot.shot_ids):
         return snapshot.shot_ids[index - 1]
@@ -1204,28 +1417,20 @@ def _build_pain_points(snapshot: IndustrialProjectSnapshot) -> list[dict[str, An
 def _build_creation_entries(snapshot: IndustrialProjectSnapshot) -> list[dict[str, str]]:
     return [
         {
-            "key": "blank_project",
-            "title": "新建项目",
-            "purpose": "创建空项目外壳，适合已经有章节、分镜或资产要逐步导入的团队。",
-            "when_to_use": "制片人已有剧本或资产，只需要 Jellyfish 工作台承接生产状态。",
-            "route_hint": "/projects -> 新建项目",
-            "output": "Project 记录；不会自动生成小说、角色或分镜。",
-        },
-        {
-            "key": "text_to_drama",
-            "title": "文本生成漫剧",
-            "purpose": "从一句创意或正文自动扩展小说稿、分集脚本、分镜、资产圣经和参考采集任务。",
-            "when_to_use": "只有创意/梗概，希望从零进入多集 AI 漫剧工业流水线。",
-            "route_hint": "/projects -> 文本生成漫剧",
-            "output": "Project、Chapter、Shot、角色/服装/道具/场景、CineForge 工作流和任务账本。",
+            "key": "unified_ai_manju_create",
+            "title": "创建 AI 漫剧",
+            "purpose": "统一承接空项目、一句话/段落生成漫剧、小说文件导入三种起步方式。",
+            "when_to_use": "任何新项目都从这里开始；有文本就进入 text-to-drama，没有文本就创建空项目壳。",
+            "route_hint": "/projects -> 创建 AI 漫剧",
+            "output": "空项目或完整 Project/Chapter/Shot/资产圣经/CineForge 工作流/参考采集任务。",
         },
         {
             "key": "film_core",
-            "title": "Film Core",
-            "purpose": "项目级控制中心，用来检查门禁、编辑九阶段状态、生成计划并创建生产任务。",
+            "title": "Film Core 项目控制中心",
+            "purpose": "已有项目的生产控制中心，用来检查门禁、编辑九阶段状态、生成计划并创建生产任务。",
             "when_to_use": "项目已经存在，需要判断是否能拍、该用什么运行时模型、哪些镜头要 QA/重试。",
             "route_hint": f"/projects/{snapshot.project_id}?tab=filmCore",
-            "output": "只读/编辑/编排已有项目状态，不负责新建空项目。",
+            "output": "只读/编辑/编排已有项目状态；新建工作已统一收敛到创建 AI 漫剧入口。",
         },
     ]
 

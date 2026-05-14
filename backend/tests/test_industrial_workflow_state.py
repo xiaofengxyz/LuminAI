@@ -232,8 +232,11 @@ async def test_text_to_drama_creates_project_episodes_shots_and_workflow_tasks()
         assert response.data.created_costume_count == response.data.created_character_count
         assert response.data.reference_harvest_task_count == response.data.created_character_count
         assert response.data.shooting_gate.ready is True
+        assert response.data.shooting_gate.state == "ready_to_shoot"
         assert response.data.workflow.workflow_key == "cineforge_ai_drama_os"
         assert response.data.workflow.stages[1].automation.mode == "automatic"
+        assert response.data.workflow.stage_data["image_runtime"]["reference_harvest"]["items"][0]["image_search_urls"]
+        assert response.data.workflow.stage_data["image_runtime"]["reference_harvest"]["items"][0]["video_search_urls"]
         task_kinds = [task.task_kind for task in response.data.tasks]
         assert task_kinds[0] == "cineforge_text_to_drama_intake"
         assert task_kinds[-1] == "cineforge_text_to_drama_auto_pipeline"

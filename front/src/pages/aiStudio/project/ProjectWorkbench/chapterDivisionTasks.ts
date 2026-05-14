@@ -62,10 +62,12 @@ export function createRelationTaskState(
   data: AsyncTaskCreateLike,
   options?: { cancelRequested?: boolean },
 ): RelationTaskState {
+  // Newly-created async tasks may spend a short time queued before polling
+  // returns the worker milestone, so start at 1% to avoid a frozen 0% display.
   return {
     taskId: data.task_id,
     status: data.status,
-    progress: 0,
+    progress: 1,
     cancelRequested: options?.cancelRequested ?? false,
   }
 }

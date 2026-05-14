@@ -57,6 +57,14 @@ async def lifespan(app: FastAPI):
     """应用生命周期：启动时初始化，关闭时清理。"""
     # 启动时：供应商注册 + 任务执行器注册（幂等）
     bootstrap_all_registries()
+    from app.core.db import async_session_maker, init_db
+    from app.services.llm.env_bootstrap import ensure_bailian_default_text_model
+
+    # 本地重启恢复时先确保表结构存在，再把 .env 中的百炼配置写入默认模型。
+    await init_db()
+    async with async_session_maker() as db:
+        await ensure_bailian_default_text_model(db)
+        await db.commit()
     yield
     # 关闭时：清理资源
     pass
