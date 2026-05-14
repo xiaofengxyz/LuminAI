@@ -336,9 +336,9 @@ POST  /api/v1/film/industrial/projects/{project_id}/plan
 POST  /api/v1/film/industrial/projects/{project_id}/run
 ```
 
-Local frontend runtime defaults to Jellyfish backend `http://127.0.0.1:8011`.
+Local frontend runtime defaults to Jellyfish backend `http://127.0.0.1:24731`.
 Use the `dev:film-core` script when you want the operator UI to be predictably
-available at `http://localhost:7790/projects`; backend CORS also allows other
+available at `http://localhost:24732/projects`; backend CORS also allows other
 local Vite ports when the port is intentionally changed.
 
 The overview endpoint maps live Jellyfish project/chapter/shot/asset/task state
@@ -369,9 +369,9 @@ opening repository docs.
 
 The same overview also exposes two producer-facing control contracts:
 
-- `creation_entries`: explains the three creation surfaces. `新建空项目` only
-  creates a blank Project shell; `一键文本生成漫剧` creates the story/assets/shots
-  from one text; `Film Core` is the existing-project control center.
+- `creation_entries`: explains the unified `创建 AI 漫剧` entry. It can create
+  a blank Project shell or route text/novel-file content into the automatic
+  text-to-drama flow; `Film Core` remains the existing-project control center.
 - `shooting_gate`: blocks render queues until the project has novel/script
   text, shot graph, characters, actor identity references, scenes, props,
   costumes, shot details, and ready shots.
@@ -449,9 +449,9 @@ Implemented:
 - provider/model runtime config isolation with base URL and key presence checks
 - Jellyfish-native Project Workbench `Film Core` tab
 - task-center writeback through `generation_tasks` and `generation_task_links`
-- CORS/runtime defaults for `7790 -> 8011`
+- CORS/runtime defaults for `24732 -> 24731`
 - OpenAPI generated frontend client
-- full local run path for backend `8011` and frontend `7790`
+- full local run path for backend `24731` and frontend `24732`
 
 UI operation is involved. The intended operator path is not command-line only:
 producers and artists use Jellyfish pages for project, chapter, assets, shots,
@@ -494,7 +494,30 @@ from a blank local setup.
 git submodule update --init --recursive
 ```
 
-2. Start Jellyfish backend and frontend on the Film Core default ports.
+2. Confirm the root `.env` contains the Alibaba Bailian API key.
+
+Supported variable names, in priority order:
+
+```env
+ALIYUN_BAILIAN_API_KEY=...
+BAILIAN_API_KEY=...
+DASHSCOPE_API_KEY=...
+VITE_API_KEY=...
+```
+
+Optional model overrides:
+
+```env
+ALIYUN_BAILIAN_MODEL=qwen-plus
+ALIYUN_BAILIAN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+```
+
+The backend reads the root `.env` and `vendor/jellyfish/backend/.env`, then
+creates or refreshes `aliyun_bailian` / `aliyun_bailian_text_default` as the
+default text model during startup. API responses only expose
+`api_key_configured=true/false`, never the key itself.
+
+3. Start Jellyfish backend and frontend on the Film Core default ports.
 
 Recommended one-command local startup:
 
@@ -504,21 +527,21 @@ scripts/start_jellyfish_film_core.sh
 
 This helper exports `NO_PROXY=localhost,127.0.0.1,::1` and uses local direct
 URLs. Without that bypass, a host proxy can return `502 Bad Gateway` for
-`127.0.0.1:8011` even when uvicorn is healthy.
+`127.0.0.1:24731` even when uvicorn is healthy.
 
 Manual backend startup:
 
 ```bash
 cd vendor/jellyfish/backend
 NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1 \
-.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8011
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 24731
 ```
 
-3. Confirm backend health.
+4. Confirm backend health.
 
 ```bash
 NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1 \
-curl --noproxy '*' http://127.0.0.1:8011/health
+curl --noproxy '*' http://127.0.0.1:24731/health
 ```
 
 Expected response:
@@ -527,31 +550,32 @@ Expected response:
 {"code":200,"message":"success","data":{"status":"ok"},"meta":null}
 ```
 
-4. Start or open the Jellyfish frontend. In this workspace it is commonly
+5. Start or open the Jellyfish frontend. In this workspace it is commonly
 served at:
 
 ```text
-http://localhost:7790/projects
+http://localhost:24732/projects
 ```
 
 If you start it manually:
 
 ```bash
 cd vendor/jellyfish/front
-VITE_BACKEND_URL=http://127.0.0.1:8011 npx pnpm@9.15.9 run dev:film-core
+VITE_BACKEND_URL=http://127.0.0.1:24731 npx pnpm@9.15.9 run dev:film-core
 ```
 
 If there are no projects yet, the project list still shows a Film Core button.
 Clicking it opens project creation first because Film Core overview is scoped to
 a concrete project.
 
-5. Configure model providers in Jellyfish:
+6. Configure image/video model providers in Jellyfish when you need real media generation:
 
 ```text
 侧边栏 -> 模型管理 -> Providers / Models / Settings
 ```
 
-At minimum:
+For text, 阿里百炼 is auto-configured from `.env`. For image/video providers,
+or when you want to override defaults from the UI, use:
 
 1. Add a Provider.
 2. Fill `文本/通用 Base URL`.
@@ -584,14 +608,16 @@ Use this path for the final product goal:
 1. Open:
 
 ```text
-http://localhost:7790/projects
+http://localhost:24732/projects
 ```
 
-2. Click `一键文本生成漫剧`.
+2. Click `创建 AI 漫剧`.
 3. Fill:
 
+- choose `自动生成漫剧`
 - `项目名称` or leave it blank to use the first sentence
 - `原始创意/梗概/正文`
+- optionally click `上传小说文件` to read a local `.txt` / `.md` manuscript
 - visual style and project style
 - episode count, for example `3`
 - shots per episode, for example `6`
@@ -635,9 +661,10 @@ recoverable state and waits for you to approve/edit/regenerate.
 ### 12.3 Create A Series Project Manually
 
 1. Open `项目列表`.
-2. Click `新建空项目`.
+2. Click `创建 AI 漫剧`.
 3. Fill:
 
+- choose `空项目`
 - project name, for example `霓虹审判`
 - visual style, for example `现实`
 - project style, for example `真人都市`
@@ -723,8 +750,8 @@ Read these panels in order:
 
 1. `九阶段交付状态`: confirms the implementation stack is complete.
 2. `拍摄前置门禁`: tells whether render tasks are allowed yet.
-3. `创建入口职责`: explains why blank project, one-click text-to-drama, and
-   Film Core are separate surfaces.
+3. `统一入口职责`: explains why all new work starts from `创建 AI 漫剧` and why
+   Film Core remains scoped to existing projects.
 4. `工业化分数`: tells whether this project is ready for batch production.
 5. `一致性健康`: shows identity, scene, prop, and costume readiness.
 6. `痛点诊断`: explains why a project is still fragile.
@@ -902,7 +929,7 @@ Are the requested document functions done?
 - Automatic/manual switches: done per stage through `execution_mode`, the Film
   Core switch, and the complete-stage endpoint.
 - Text-to-drama entry: done through `POST /api/v1/film/industrial/text-to-drama`
-  and the `一键文本生成漫剧` project-list UI. It now generates novel manuscript,
+  and the `创建 AI 漫剧` project-list UI. It now generates novel manuscript,
   episode scripts, storyboard shots, asset bibles, frame slots, VFX notes, and
   role reference-harvest tasks.
 - Shooting gate: done through Film Core `shooting_gate`; production plans do not
@@ -917,7 +944,7 @@ Does this involve page UI operation?
 
 Yes. The operable UI surfaces are:
 
-- `项目列表 -> 一键文本生成漫剧`
+- `项目列表 -> 创建 AI 漫剧`
 - `项目列表/项目卡片/项目速览 -> Film Core`
 - `Project Workbench -> Film Core`
 - `模型管理 -> Providers / Models / Settings`

@@ -11,8 +11,9 @@ from typing import Any
 JELLYFISH_UPSTREAM_URL = "https://github.com/Forget-C/Jellyfish"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_JELLYFISH_BASE_PATH = REPO_ROOT / "vendor" / "jellyfish"
-JELLYFISH_FRONTEND_URL = "http://localhost:7788"
-JELLYFISH_LOCAL_BACKEND_URL = "http://localhost:8011"
+JELLYFISH_LOCAL_FRONTEND_URL = "http://localhost:24732"
+JELLYFISH_DOCKER_FRONTEND_URL = "http://localhost:7788"
+JELLYFISH_LOCAL_BACKEND_URL = "http://localhost:24731"
 JELLYFISH_DOCKER_BACKEND_URL = "http://localhost:8000"
 
 
@@ -101,9 +102,10 @@ def inspect_jellyfish_base(
     site_dir = _optional_rel(path / "site")
 
     ports = {
-        "frontend": JELLYFISH_FRONTEND_URL,
+        "frontend": JELLYFISH_LOCAL_FRONTEND_URL,
         "backend": JELLYFISH_LOCAL_BACKEND_URL,
         "backend_docs": f"{JELLYFISH_LOCAL_BACKEND_URL}/docs",
+        "docker_frontend": JELLYFISH_DOCKER_FRONTEND_URL,
         "docker_backend": JELLYFISH_DOCKER_BACKEND_URL,
         "docker_backend_docs": f"{JELLYFISH_DOCKER_BACKEND_URL}/docs",
         "mysql": "localhost:${MYSQL_PORT:-3306}",
@@ -113,7 +115,7 @@ def inspect_jellyfish_base(
     run_commands = _run_commands(rel_path)
     notes = [
         "Jellyfish is tracked as the studio OS base. LuminAI stays runtime-neutral below the platform boundary.",
-        "Local dev uses backend port 8011 so an existing service on 8000 does not shadow the Film Core API.",
+        "Local dev uses uncommon ports 24731/24732 so other projects on 8000/8011/7788/7790 do not shadow Film Core.",
         "Use port overrides if local Redis or MySQL is already bound on default ports.",
     ]
     if missing:
@@ -151,7 +153,7 @@ def _run_commands(rel_path: str) -> list[JellyfishRunCommand]:
                 "up -d --build"
             ),
             ports={
-                "frontend": JELLYFISH_FRONTEND_URL,
+                "frontend": JELLYFISH_DOCKER_FRONTEND_URL,
                 "backend": JELLYFISH_DOCKER_BACKEND_URL,
                 "backend_docs": f"{JELLYFISH_DOCKER_BACKEND_URL}/docs",
             },
@@ -166,7 +168,7 @@ def _run_commands(rel_path: str) -> list[JellyfishRunCommand]:
             cwd=f"{rel_path}/backend",
             command=(
                 "cp .env.example .env && uv sync && "
-                "uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8011"
+                "uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 24731"
             ),
             ports={"backend": JELLYFISH_LOCAL_BACKEND_URL, "backend_docs": f"{JELLYFISH_LOCAL_BACKEND_URL}/docs"},
         ),
@@ -174,8 +176,8 @@ def _run_commands(rel_path: str) -> list[JellyfishRunCommand]:
             id="frontend_dev",
             label="Frontend local dev",
             cwd=f"{rel_path}/front",
-            command="pnpm install && pnpm dev --host 0.0.0.0",
-            ports={"frontend": JELLYFISH_FRONTEND_URL},
+            command="pnpm install && VITE_BACKEND_URL=http://127.0.0.1:24731 pnpm run dev:film-core",
+            ports={"frontend": JELLYFISH_LOCAL_FRONTEND_URL},
         ),
     ]
 

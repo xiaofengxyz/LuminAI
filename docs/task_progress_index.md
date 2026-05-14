@@ -2,6 +2,28 @@
 
 Current task: Implement the industrial AI film engine requirements inside the existing Jellyfish UI/backend, keep a single-agent execution path, update progress continuously, test, run, clean, resolve conflicts, and push necessary changes.
 
+## Session 2026-05-15 - Reboot Recovery, Bailian Runtime, And AI Manju Closure
+
+| Node | Status | Evidence |
+| --- | --- | --- |
+| 1. Plan and reboot baseline | Done | Single-agent execution confirmed; no sub-agents will be launched. Reboot left Jellyfish backend/frontend ports free; root and Jellyfish submodule contain unfinished product/Film Core/OpenAPI/doc changes from the previous session and will be continued instead of overwritten. |
+| 2. Product requirements | Done | Added Chinese PRD `docs/ai_manjv_unified_product_requirements.md` covering user roles, industry pain points, unified creation/import flow, Film Core production modules, Bailian env requirements, uncommon ports `24731/24732`, non-functional requirements, and acceptance criteria. |
+| 3. Architecture and implementation | Done | Initially selected `18731/18732`, then detected they were occupied by `/mnt/d/workplace/FilmCreator`; switched local Jellyfish Film Core defaults to currently free uncommon ports `24731/24732`. Frontend runtime/OpenAPI/env.js/start script/CORS/docs/tests align. Added backend root `.env` loading and `ensure_bailian_default_text_model` startup bootstrap so 阿里百炼 becomes the default text LLM from `ALIYUN_BAILIAN_API_KEY`/`BAILIAN_API_KEY`/`DASHSCOPE_API_KEY`/compatible `VITE_API_KEY` without exposing the secret. Existing Film Core production modules, unified creation modal, reference harvest UI, and OpenAPI generated types remain aligned. Targeted root tests passed 16; targeted Jellyfish backend tests passed 19; frontend typecheck passed. |
+| 4. Test-engineer pass | Done | Full root `python3 -m pytest -q -s` passed 152 before final port migration; full Jellyfish backend `.venv/bin/python -m pytest -q -s` passed 296 before final port migration; frontend build passed twice with the existing large-chunk warning, including after switching to `24731/24732`. After detecting `18731/18732` conflict and migrating to `24731/24732`, targeted root port/Film Core tests passed 7, targeted backend CORS/Bailian tests passed 14, frontend typecheck passed, and live smoke on `http://127.0.0.1:24731` / `http://localhost:24732/projects` passed. Smoke created temporary project `codex-smoke-ai-manju-0515-24731`, verified 阿里百炼 runtime config with `api_key_configured=true`, generated 2 chapters, 6 shots, 3 characters, 3 reference-harvest tasks, `shooting_gate.ready=true`, 10 production modules, 6 render queue items, and deleted the project with a follow-up 404 confirmation. |
+| 5. User manual and completion review | Done | Added `docs/ai_manjv_operator_manual.md` with Chinese zero-to-multi-episode usage from `.env` Bailian configuration, service startup on `24731/24732`, runtime-config verification, unified creation/import, blank project path, Film Core gate/progress/reference harvest, production task creation, QA/Retry, and post-production. Updated README/manual/test docs to confirm UI operation is required, industry pain points are covered, and provider-specific media workers remain runtime extensions. |
+| 6. Cleanup, conflict scan, commit, push | In Progress | Removed generated caches and frontend `dist`; preserved `.env`, `.runtime` logs, `.venv`, and tracked `.cursor` files. Added `.env` to `.gitignore` so local Bailian keys are not committed. Conflict-marker scan found none; root and Jellyfish `git diff --check` passed. Jellyfish submodule commit `c594c55` was pushed to `origin/vendor-jellyfish-industrial-film-core`; root commit/push remains. |
+
+## Session 2026-05-13 - Unified AI Manju Entry And Production Progress
+
+| Node | Status | Evidence |
+| --- | --- | --- |
+| 1. Plan and baseline review | In Progress | Single-agent execution confirmed; root `main...origin/main` and Jellyfish submodule `main...origin/vendor-jellyfish-industrial-film-core` are clean. Active implementation surfaces are Jellyfish `POST /api/v1/film/industrial/text-to-drama`, Project Lobby, Film Core tab, script division task flow, OpenAPI generated client, and docs/manual/test cases. |
+| 2. Product requirements | Done | Added `docs/ai_manjv_unified_product_requirements.md` covering unified creation/import, one-sentence/file-to-novel, episode and storyboard extraction, character/asset/VFX extraction, role image/video reference harvesting, module progress, return routes, and acceptance criteria. |
+| 3. Architecture and implementation | Done | Added backend `production_modules` overview contract; synced OpenAPI/generated client; Project Lobby now has one `创建 AI 漫剧` modal with automatic text/file-to-drama and blank-project modes; local `.txt/.md` import fills source text; Film Core renders module progress, return routes, and role image/video reference candidates; chapter division tasks start at 1% and show a visible progress strip. Frontend typecheck passed; targeted backend workflow/script-task tests passed 29; root Film Core contract tests passed 9. |
+| 4. Test-engineer pass | Pending | Need backend/root/frontend regression tests plus live run smoke after implementation. |
+| 5. Manuals and completion review | Pending | Need detailed zero-to-multi-episode user manual, feature-completion review, UI-operation coverage, and industry pain-point coverage. |
+| 6. Cleanup, conflict scan, commit, push | Pending | Need cache/build cleanup, conflict-marker scan, diff check, commits, and push if remotes accept. |
+
 ## Session 2026-05-13 - AI Manju Product Gap Closure
 
 | Node | Status | Evidence |

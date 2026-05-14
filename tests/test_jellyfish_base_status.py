@@ -26,8 +26,10 @@ def test_inspect_jellyfish_base_accepts_api_shape_without_git_checkout(tmp_path:
     assert payload["missing"] == []
     assert payload["run_commands"][0]["id"] == "docker_compose"
     assert "7788" in payload["run_commands"][0]["ports"]["frontend"]
-    assert payload["ports"]["backend"] == "http://localhost:8011"
-    assert "--port 8011" in payload["run_commands"][1]["command"]
+    assert payload["ports"]["frontend"] == "http://localhost:24732"
+    assert payload["ports"]["backend"] == "http://localhost:24731"
+    assert "--port 24731" in payload["run_commands"][1]["command"]
+    assert "dev:film-core" in payload["run_commands"][2]["command"]
 
 
 def test_stage_index_uses_artifacts_as_completion_evidence():

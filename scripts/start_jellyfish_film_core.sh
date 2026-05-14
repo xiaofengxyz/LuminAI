@@ -6,12 +6,22 @@ BACKEND_DIR="$ROOT_DIR/vendor/jellyfish/backend"
 FRONT_DIR="$ROOT_DIR/vendor/jellyfish/front"
 LOG_DIR="$ROOT_DIR/.runtime/logs"
 BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
-BACKEND_PORT="${BACKEND_PORT:-8011}"
+BACKEND_PORT="${BACKEND_PORT:-24731}"
 FRONT_HOST="${FRONT_HOST:-0.0.0.0}"
-FRONT_PORT="${FRONT_PORT:-7790}"
+FRONT_PORT="${FRONT_PORT:-24732}"
 BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:${BACKEND_PORT}}"
 
 mkdir -p "$LOG_DIR"
+
+# Load local secrets for the backend and Vite child process without printing
+# them. The backend also reads this file directly, but exporting keeps CLI
+# tools and subprocesses consistent after a reboot.
+if [[ -f "$ROOT_DIR/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/.env"
+  set +a
+fi
 
 # Local dev must bypass host proxies; otherwise localhost health checks can
 # return proxy 502 even when uvicorn and Vite are listening correctly.

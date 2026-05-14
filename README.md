@@ -105,14 +105,20 @@ Expected Jellyfish URLs:
 Frontend: http://localhost:7788
 Backend:  http://localhost:8000  (Docker Compose)
 Docs:     http://localhost:8000/docs
-Backend:  http://127.0.0.1:8011  (local dev / Film Core default)
-Docs:     http://127.0.0.1:8011/docs
+Backend:  http://127.0.0.1:24731  (local dev / Film Core default)
+Frontend: http://localhost:24732/projects  (local dev / Film Core default)
+Docs:     http://127.0.0.1:24731/docs
 ```
 
-The checked-in frontend runtime config defaults to `http://127.0.0.1:8011`
-for local development so an unrelated service or proxy on port 8000 cannot
-shadow the Jellyfish Film Core API. Docker deployments can still override
-`BACKEND_URL`.
+The checked-in frontend runtime config defaults to `http://127.0.0.1:24731`
+for local development so unrelated services on common ports such as 8000, 8011,
+7788, or 7790 cannot shadow the Jellyfish Film Core API. Docker deployments can
+still override `BACKEND_URL`.
+
+The backend reads both the repository root `.env` and `vendor/jellyfish/backend/.env`.
+If `ALIYUN_BAILIAN_API_KEY`, `BAILIAN_API_KEY`, `DASHSCOPE_API_KEY`, or the
+current compatible `VITE_API_KEY` is present, startup automatically configures
+阿里百炼 as the default text LLM without exposing the secret in API responses.
 
 ## Development Direction
 
@@ -141,14 +147,17 @@ nine Prompt-derived modules also has an automatic/manual switch: automatic
 completion activates the next stage, while manual completion records a
 `waiting_operator` gate.
 
-The project list intentionally has three separate surfaces:
+The project list now has one creation/import surface: `创建 AI 漫剧`. The modal
+can create a blank project shell, expand one sentence or paragraph into
+generated novel chapters, or read a local `.txt` / `.md` manuscript into the
+same text-to-drama flow. Existing project cards and project previews still open
+Film Core as the project control center.
 
-- `新建空项目`: creates only a blank Jellyfish project shell for teams that
-  already have scripts or assets.
-- `一键文本生成漫剧`: expands one source text into generated novel chapters,
-  episode scripts, storyboard shots, character/scene/prop/costume/VFX bibles,
-  frame slots, role web reference-harvest tasks, and CineForge workflow state.
-- `Film Core`: opens the existing-project production control center.
+Film Core now also renders `AI漫剧生产进度`: module-level progress from project
+intake through novel/script, episode breakdown, asset bible, web reference
+harvest, storyboard graph, shot preparation, render runtime, QA/retry, and final
+editing. Each module carries a percentage, checklist, blocker list, and return
+route so operators can go back to earlier modules without losing approved state.
 
 Film Core now includes a `shooting_gate`. If characters, actor identity
 references, scenes, props, costumes, shot details, or ready shots are missing,
@@ -158,14 +167,14 @@ starting before the asset bible exists.
 Industrial Film Core endpoints:
 
 ```text
-POST  http://127.0.0.1:8011/api/v1/film/industrial/text-to-drama
-GET   http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/overview
-GET   http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/workflow-state
-PATCH http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}
-POST  http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/regenerate
-POST  http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/complete
-POST  http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/plan
-POST  http://127.0.0.1:8011/api/v1/film/industrial/projects/{project_id}/run
+POST  http://127.0.0.1:24731/api/v1/film/industrial/text-to-drama
+GET   http://127.0.0.1:24731/api/v1/film/industrial/projects/{project_id}/overview
+GET   http://127.0.0.1:24731/api/v1/film/industrial/projects/{project_id}/workflow-state
+PATCH http://127.0.0.1:24731/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}
+POST  http://127.0.0.1:24731/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/regenerate
+POST  http://127.0.0.1:24731/api/v1/film/industrial/projects/{project_id}/workflow-state/{stage_key}/complete
+POST  http://127.0.0.1:24731/api/v1/film/industrial/projects/{project_id}/plan
+POST  http://127.0.0.1:24731/api/v1/film/industrial/projects/{project_id}/run
 ```
 
 For local development, the easiest path is the no-proxy helper:
@@ -174,29 +183,31 @@ For local development, the easiest path is the no-proxy helper:
 scripts/start_jellyfish_film_core.sh
 ```
 
-Or start the Jellyfish backend on `8011` manually:
+Or start the Jellyfish backend on `24731` manually:
 
 ```bash
 cd vendor/jellyfish/backend
 NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1 \
-.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8011
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 24731
 ```
 
 Start the Jellyfish frontend on the Film Core operator port:
 
 ```bash
 cd vendor/jellyfish/front
-VITE_BACKEND_URL=http://127.0.0.1:8011 npx pnpm@9.15.9 run dev:film-core
+VITE_BACKEND_URL=http://127.0.0.1:24731 npx pnpm@9.15.9 run dev:film-core
 ```
 
 Open:
 
 ```text
-http://localhost:7790/projects
+http://localhost:24732/projects
 ```
 
 Reference docs:
 
+- `docs/ai_manjv_unified_product_requirements.md`
+- `docs/ai_manjv_operator_manual.md`
 - `docs/jellyfish_base_integration_blueprint.md`
 - `docs/project_function_manual.md`
 - `docs/industrial_ai_film_engine_review_2026.md`

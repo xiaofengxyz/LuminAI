@@ -20,7 +20,7 @@
 
 ## Data Flow
 
-Source Text → Text-To-Drama Intake → Generated Novel → Episode Scripts → Asset Bible / Reference Harvest → Jellyfish Project/Chapter/Shot Workspace → Story Graph → Director Planner → Film Core Shooting Gate → Prompt Compiler → Runtime Adapter → Render Runtime → Video Models → QA Engine → Retry Engine → Final Editing
+Unified AI Manju Entry → Source Text / Novel File / Blank Shell → Text-To-Drama Intake → Generated Novel → Episode Scripts → Asset Bible / Reference Harvest → Jellyfish Project/Chapter/Shot Workspace → Story Graph → Director Planner → Film Core Shooting Gate → Prompt Compiler → Runtime Adapter → Render Runtime → Video Models → QA Engine → Retry Engine → Final Editing
 
 ## Implemented Foundation
 
@@ -73,12 +73,29 @@ text input. Film Core then exposes a `shooting_gate`; render queues stay empty
 until script, shot graph, characters, identity references, scenes, props,
 costumes, shot details, and ready shots exist.
 
+The Project Lobby creation surface is unified as `创建 AI 漫剧`. It can start a
+blank project, accept a short idea or long source text, or read a local novel
+file into the same source text field. The Film Core overview now returns
+`production_modules`, which separates operator progress from the runtime
+pipeline: project intake, novel/script, episode breakdown, asset bible, web
+reference harvest, storyboard graph, shot preparation, render runtime, QA/retry,
+and final editing each expose status, percentage, tasks, blockers, and a route
+back to the editable module.
+
 Model execution stays behind the Jellyfish provider/model adapter boundary:
 providers store `base_url`, optional image/video base URL overrides, and
 `api_key`/`api_secret`; runtime config APIs expose only the resolved adapter,
 base URL, and key-present flags. Built-in registry keys include OpenAI,
-Volcengine, ComfyUI, FLUX, SDXL, StoryDiffusion, Kling, Seedance, Veo, Wan2.1,
-Sora, and Vidu, while concrete workers remain replaceable modules.
+Volcengine, 阿里百炼, ComfyUI, FLUX, SDXL, StoryDiffusion, Kling, Seedance,
+Veo, Wan2.1, Sora, and Vidu, while concrete workers remain replaceable modules.
+On local startup the Jellyfish backend reads the repository root `.env` and
+backend `.env`; when a Bailian/DashScope-compatible key is present, it
+bootstraps 阿里百炼 as the default text model without exposing the secret.
+
+The local Jellyfish operator topology uses uncommon ports by default:
+backend `24731` and frontend `24732`. Docker Compose keeps its upstream
+`8000/7788` mapping, but the checked-in Film Core dev path avoids common
+cross-project conflicts.
 
 ## Key Principles
 

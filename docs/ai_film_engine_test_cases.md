@@ -38,10 +38,10 @@
 | Workflow state backend contract | `.venv/bin/python -m pytest -q -s tests/test_industrial_workflow_state.py` from `vendor/jellyfish/backend` | Persisted `CineForgeWorkflowState` initializes nine stages; editing creates a succeeded workflow-edit task; regenerating creates a pending stage-regenerate task; completing a stage either auto-activates the next stage or stops with `waiting_operator`; text-to-drama creates generated novel chapters, script outlines, storyboard shots, character/actor/costume/scene/prop assets, frame slots, reference-harvest tasks, and workflow tasks. |
 | Backend route import | `PYTHONPATH=. .venv/bin/python -c "from app.api.v1.routes.film.industrial import router; print(len(router.routes))"` from `vendor/jellyfish/backend` | Prints `8`, covering text-to-drama, overview, workflow-state load/edit/regenerate/complete, plan, and run endpoints. |
 | Frontend type safety | `npx pnpm@9.15.9 run typecheck` from `vendor/jellyfish/front` | Project Workbench `Film Core` tab, OpenAPI generated client wrapper, text-to-drama entry, workflow-state automation controls, and generated types typecheck. |
-| Manual UI smoke | Open `/projects/{projectId}?tab=filmCore` in Jellyfish frontend | Film Core tab shows `九阶段交付状态`, `拍摄前置门禁`, `创建入口职责`, persisted `CineForge 可编辑工作流状态`, automatic/manual stage switch, complete/regenerate/edit buttons, 11-node production pipeline, consistency health, pain-point diagnosis, plan button, and reference project breakdown inside the existing Jellyfish workbench. |
-| Text-to-drama UI smoke | Open `http://localhost:7790/projects`, click `一键文本生成漫剧` | A source text can create a project, generated novel chapters, per-episode scripts, storyboard shots, asset bibles, role reference-harvest tasks, workflow state, and task-ledger entries, then navigate to `/projects/{projectId}?tab=filmCore`. |
-| Reboot service recovery | Run `scripts/start_jellyfish_film_core.sh` or start backend with `.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8011`, then start frontend with `VITE_BACKEND_URL=http://127.0.0.1:8011 npx pnpm@9.15.9 run dev:film-core` | `/health` returns 200 with `curl --noproxy '*'`, `http://localhost:7790/projects` returns the Vite HTML shell, and the Film Core/text-to-drama toolbar buttons remain discoverable even when the project list is empty. |
-| CORS and runtime backend | `python3 -m pytest -q -s tests/test_jellyfish_cors_runtime_config.py` | Frontend runtime defaults to Jellyfish backend `8011`; `/api/v1/studio/projects` and `/api/v1/film/tasks?recent_seconds=15&page=1&page_size=50` return CORS headers for local frontend port `7790`. |
+| Manual UI smoke | Open `/projects/{projectId}?tab=filmCore` in Jellyfish frontend | Film Core tab shows `九阶段交付状态`, `拍摄前置门禁`, `统一入口职责`, persisted `CineForge 可编辑工作流状态`, automatic/manual stage switch, complete/regenerate/edit buttons, `AI漫剧生产进度`, 11-node production pipeline, consistency health, pain-point diagnosis, plan button, reference harvest, and reference project breakdown inside the existing Jellyfish workbench. |
+| Text-to-drama UI smoke | Open `http://localhost:24732/projects`, click `创建 AI 漫剧`, choose `自动生成漫剧` | A source text or uploaded `.txt` / `.md` manuscript can create a project, generated novel chapters, per-episode scripts, storyboard shots, asset bibles, role reference-harvest tasks, workflow state, and task-ledger entries, then navigate to `/projects/{projectId}?tab=filmCore`. |
+| Reboot service recovery | Run `scripts/start_jellyfish_film_core.sh` or start backend with `.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 24731`, then start frontend with `VITE_BACKEND_URL=http://127.0.0.1:24731 npx pnpm@9.15.9 run dev:film-core` | `/health` returns 200 with `curl --noproxy '*'`, `http://localhost:24732/projects` returns the Vite HTML shell, and the Film Core/text-to-drama toolbar buttons remain discoverable even when the project list is empty. |
+| CORS and runtime backend | `python3 -m pytest -q -s tests/test_jellyfish_cors_runtime_config.py` | Frontend runtime defaults to Jellyfish backend `24731`; `/api/v1/studio/projects` and `/api/v1/film/tasks?recent_seconds=15&page=1&page_size=50` return CORS headers for local frontend port `24732`. |
 | Industrial run writeback | `POST /api/v1/film/industrial/projects/{projectId}/run` | Creates Jellyfish `generation_tasks` and `generation_task_links` for render, QA, retry, post-production, or a blocker gate task. |
 | Jellyfish backend regression | `.venv/bin/python -m pytest -q -s` from `vendor/jellyfish/backend` | Full backend suite passes, including CORS middleware, Studio APIs, task center, response envelopes, and video capability mapping. |
 
@@ -54,6 +54,7 @@
 | Kling routing | `python3 -m pytest -q -s tests/test_kling_provider_routing.py` | Kling requests are routed without leaking story logic into the provider. |
 | Vidu routing | `python3 -m pytest -q -s tests/test_vidu_provider_routing.py` | Vidu requests preserve runtime adapter contracts. |
 | Jellyfish runtime model config | `.venv/bin/python -m pytest -q -s tests/test_llm_manage.py` from `vendor/jellyfish/backend` | Provider registry includes cinematic runtime gateways; model runtime config resolves category-specific base URL and key-configured state without leaking secrets. |
+| Bailian env bootstrap | `.venv/bin/python -m pytest -q -s tests/test_llm_manage.py` from `vendor/jellyfish/backend` | `.env`-resolved Bailian/DashScope-compatible API keys create or refresh `aliyun_bailian`, create `aliyun_bailian_text_default`, set it as the default text model, and expose only `api_key_configured=true`. |
 
 ## 6. Full Regression
 
@@ -90,7 +91,7 @@ Check:
 - one retry request is visible through the failed shot
 - Jellyfish base panel shows path, commit, ports, and Docker command
 - `npx pnpm@9.15.9 run dev:film-core` serves the Jellyfish UI at
-  `http://localhost:7790/projects`
+  `http://localhost:24732/projects`
 - Jellyfish project cards, preview side panel, and workbench header expose direct
   Film Core entry points
 - Empty project lists still expose a Film Core button that opens project
@@ -103,7 +104,7 @@ Check:
 - The stage switch can set `automatic` or `manual`; completing an automatic
   stage activates the next stage, and completing a manual stage records
   `waiting_operator`
-- The project list `一键文本生成漫剧` entry creates generated novel chapters,
+- The project list `创建 AI 漫剧` entry creates generated novel chapters,
   storyboard shots, character/scene/prop/costume assets, frame slots, and role
   reference-harvest tasks from one text input, then opens Film Core
 - `拍摄前置门禁` blocks render queues when novel/script text, shot graph,
@@ -124,5 +125,5 @@ Check:
   detectors still require provider/runtime worker integration.
 - In an earlier session, Jellyfish Docker Compose full-stack startup was blocked by a
   Debian apt mirror `502/404` during backend image build. The verified fallback
-  local run path is SQLite backend on port 8011 plus `dev:film-core` frontend on
-  port 7790.
+  local run path is SQLite backend on port 24731 plus `dev:film-core` frontend on
+  port 24732.

@@ -70,10 +70,23 @@ def test_industrial_overview_maps_jellyfish_state_to_full_film_pipeline():
     assert overview["qa_retry"]["automatic_retry_enabled"] is True
     assert overview["shooting_gate"]["ready"] is True
     assert [entry["key"] for entry in overview["creation_entries"]] == [
-        "blank_project",
-        "text_to_drama",
+        "unified_ai_manju_create",
         "film_core",
     ]
+    assert [module["key"] for module in overview["production_modules"]] == [
+        "project_intake",
+        "novel_script",
+        "episode_breakdown",
+        "asset_bible",
+        "reference_harvest",
+        "storyboard_graph",
+        "shot_preparation",
+        "render_runtime",
+        "qa_retry",
+        "final_editing",
+    ]
+    assert overview["production_modules"][5]["progress"] == 100
+    assert overview["production_modules"][6]["route_hint"].endswith("tab=chapters")
     assert any(item["name"] == "Jellyfish" for item in overview["reference_projects"])
 
 
@@ -325,12 +338,16 @@ def test_project_workbench_surfaces_film_core_from_lobby_and_generated_client():
     assert "创建生产任务" in film_core_source
     assert "CineForge 可编辑工作流状态" in film_core_source
     assert "拍摄前置门禁" in film_core_source
-    assert "创建入口职责" in film_core_source
+    assert "AI漫剧生产进度" in film_core_source
+    assert "角色网络参考采集" in film_core_source
+    assert "统一入口职责" in film_core_source
     assert "保存阶段编辑" in film_core_source
     assert "重生成阶段" in film_core_source
     assert "阶段推进开关" in film_core_source
     assert "完成并推进" in film_core_source
-    assert "文本生成漫剧" in lobby_source
+    assert "创建 AI 漫剧" in lobby_source
+    assert "上传小说文件" in lobby_source
+    assert "creation_mode" in lobby_source
     assert "reference_harvest_enabled" in lobby_source
     assert "fallbackRatio || '9:16'" in (front_dir / "pages" / "aiStudio" / "chapter" / "ChapterStudio.tsx").read_text(
         encoding="utf-8"

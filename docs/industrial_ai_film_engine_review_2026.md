@@ -79,8 +79,8 @@ Expected Jellyfish ports:
 Frontend: http://localhost:7788
 Backend:  http://localhost:8000  (Docker Compose)
 Docs:     http://localhost:8000/docs
-Backend:  http://localhost:8011  (local dev / Film Core default)
-Docs:     http://localhost:8011/docs
+Backend:  http://localhost:24731  (local dev / Film Core default)
+Docs:     http://localhost:24731/docs
 ```
 
 Run note from this session:
@@ -89,8 +89,8 @@ Run note from this session:
 - Full Docker Compose startup was attempted, but backend image build hit Debian
   apt mirror `502/404` while installing base system packages.
 - Current local fallback run path: Jellyfish backend via SQLite on
-  `http://127.0.0.1:8011/openapi.json`, and the Jellyfish frontend through
-  `npx pnpm@9.15.9 run dev:film-core` on `http://127.0.0.1:7790/`.
+  `http://127.0.0.1:24731/openapi.json`, and the Jellyfish frontend through
+  `npx pnpm@9.15.9 run dev:film-core` on `http://127.0.0.1:24732/`.
 
 ## 3. Current Open Source Baseline
 
@@ -214,7 +214,7 @@ Key design rules:
 | Text-to-drama blueprint compiler | `vendor/jellyfish/backend/app/services/film/text_to_drama.py` |
 | CineForge workflow persistence | `vendor/jellyfish/backend/app/models/industrial.py`, workflow-state endpoints, `vendor/jellyfish/backend/tests/test_industrial_workflow_state.py` |
 | Jellyfish-native Film Core UI | `vendor/jellyfish/front/src/pages/aiStudio/project/ProjectWorkbench/tabs/FilmCoreTab.tsx`, `vendor/jellyfish/front/src/services/industrialFilm.ts` |
-| Text-to-drama intake | `POST /api/v1/film/industrial/text-to-drama`, `ProjectLobby.tsx` `一键文本生成漫剧` modal |
+| Text-to-drama intake | `POST /api/v1/film/industrial/text-to-drama`, `ProjectLobby.tsx` unified `创建 AI 漫剧` modal |
 | Runtime adapter config | Jellyfish `Provider`/`Model` records, `/api/v1/llm/models/{model_id}/runtime-config`, provider registry bootstrap |
 
 ## 8. What Is Still Not Claimed Done
